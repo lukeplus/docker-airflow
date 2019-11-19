@@ -145,11 +145,6 @@
             return formatedData;
         }
         //全部完成后
-        // $.ajax({
-        //     url: getTablesUrl,
-        //     cache: false}), $.ajax({
-        //     url: getColumnsUrl,
-        //     cache: false})
         $.when($.ajax({
             url: getConnectionsUrl,
             cache: false}),
@@ -163,7 +158,7 @@
                 columnsData = formatColumnsData(res3[0].tables);
                 var taskCard = $('.subtask_list_wrapper').subTaskCard({
                     ele: $('.subtask_list_wrapper'),
-                    data: [connectionsData, connectionsData, connectionsData],
+                    data: [connectionsData, tablesData, columnsData],
                 });
                 subTaskNameInputBlur(taskCard.$ele.find('.sub_task_name'));
         }, function() {

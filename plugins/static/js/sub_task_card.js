@@ -8,6 +8,7 @@
                 this.selectData = options.data;
                 this.$ele = this.createView();
                 this.append();
+                this.attachPicker();
                 this.attachEvent();
             },
             template: function() {
