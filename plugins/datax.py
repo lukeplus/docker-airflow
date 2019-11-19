@@ -1,4 +1,6 @@
+# -*- coding:utf-8 -*-
 # This is the class you derive to create a plugin
+
 import json
 import uuid
 import subprocess
@@ -30,6 +32,7 @@ from airflow.utils.db import create_session, provide_session
 from airflow.www_rbac.app import csrf
 from airflowext.dag_utils import generate_dag_file
 from airflowext.sqlalchemy_utils import dbutil, create_external_session
+from airflowext.datax_util import DataXConnectionInfo, RDMS2RDMSDataXJob
 
 
 SYNC_TYPES = ["增量同步", "全量同步"]
@@ -104,21 +107,28 @@ class RDMS2RDMSOperator(BaseOperator):
 
     @apply_defaults
     def __init__(self,
+                 sync_type,
                  src_conn_id,
                  src_query_sql,
                  tar_conn_id,
                  tar_table,
                  tar_columns,
-                 tar_pre_sql,
+                 append_column,
                  *args,
                  **kwargs):
+        """
+            :param append_column: 增量字段; 当同步类型为增量同步时有效。
+        """
+
         super().__init__(*args, **kwargs)
+        assert sync_type in SYNC_TYPES
+        self.sync_type = sync_type
         self.src_conn_id = src_conn_id
         self.src_query_sql = src_query_sql
         self.tar_conn_id = tar_conn_id
         self.tar_table = tar_table
         self.tar_columns = tar_columns
-        self.tar_pre_sql = tar_pre_sql
+        self.append_column = append_column
 
     def execute(self, context):
         """
@@ -127,15 +137,25 @@ class RDMS2RDMSOperator(BaseOperator):
         self.log.info('RDMS2RDMSOperator execute...')
         task_id = context['task_instance'].dag_id + "#" + context['task_instance'].task_id
 
-        self.hook = RDBMS2RDBMSHook(
-                        task_id=task_id,
-                        src_conn_id=self.src_conn_id,
-                        src_query_sql=self.src_query_sql,
-                        tar_conn_id=self.tar_conn_id,
-                        tar_table=self.tar_table,
-                        tar_columns=self.tar_columns,
-                        tar_pre_sql=self.tar_pre_sql,
-                    )
+        if self.sync_type == "全量同步":
+            self.hook = RDBMS2RDBMSFullHook(
+                            task_id=task_id,
+                            src_conn_id=self.src_conn_id,
+                            src_query_sql=self.src_query_sql,
+                            tar_conn_id=self.tar_conn_id,
+                            tar_table=self.tar_table,
+                            tar_columns=self.tar_columns,
+                        )
+        elif self.sync_type == "增量同步":
+            self.hook = RDBMS2RDBMSAppendHook(
+                            task_id=task_id,
+                            src_conn_id=self.src_conn_id,
+                            src_query_sql=self.src_query_sql,
+                            tar_conn_id=self.tar_conn_id,
+                            tar_table=self.tar_table,
+                            tar_columns=self.tar_columns,
+                            append_column=self.append_column
+                        )
         self.hook.execute(context=context)
 
     def on_kill(self):
@@ -143,9 +163,59 @@ class RDMS2RDMSOperator(BaseOperator):
         os.killpg(os.getpgid(self.hook.sp.pid), signal.SIGTERM)
 
 
-class RDBMS2RDBMSHook(BaseHook):
+class RDBMS2RDBMSFullHook(BaseHook):
     """
-    Datax执行器
+    Datax执行器:全量同步
+    """
+
+    def __init__(self,
+                 task_id,
+                 src_conn_id,
+                 src_query_sql,
+                 tar_conn_id,
+                 tar_table,
+                 tar_columns):
+        self.task_id = task_id
+        self.src_conn = self.get_connection(src_conn_id)
+        self.src_query_sql = src_query_sql
+        self.tar_conn = self.get_connection(tar_conn_id)
+        self.tar_table = tar_table
+        self.tar_columns = tar_columns
+        self.tar_pre_sql = "DELETE FROM %s" % self.tar_table
+
+    def execute(self, context):
+        self.log.info('RDMS2RDMSOperator execute...')
+
+        self.task_id = context['task_instance'].dag_id + "#" + context['task_instance'].task_id
+        self.run_datax_job()
+
+    def trans_conn_to_datax_conn(self, conn):
+        """
+            airflow Connection对象转datax的DataXConnectionInfo对象
+        """
+        return DataXConnectionInfo(
+            conn.conn_type,
+            conn.host.strip(),
+            str(conn.port),
+            conn.schema.strip(),
+            conn.login.strip(),
+            conn.password.strip(),
+        )
+
+    def run_datax_job(self):
+        job = RDMS2RDMSDataXJob(self.task_id,
+                                self.trans_conn_to_datax_conn(self.src_conn),
+                                self.trans_conn_to_datax_conn(self.tar_conn),
+                                self.src_query_sql,
+                                self.tar_table,
+                                self.tar_columns,
+                                self.tar_pre_sql)
+        job.execute()
+
+
+class RDBMS2RDBMSAppendHook(BaseHook):
+    """
+    Datax执行器: 增量同步
     """
 
     def __init__(self,
@@ -155,150 +225,104 @@ class RDBMS2RDBMSHook(BaseHook):
                  tar_conn_id,
                  tar_table,
                  tar_columns,
-                 tar_pre_sql):
+                 append_column):
         self.task_id = task_id
         self.src_conn = self.get_connection(src_conn_id)
         self.src_query_sql = src_query_sql
         self.tar_conn = self.get_connection(tar_conn_id)
         self.tar_table = tar_table
+        self.tmp_tar_table = "tmp_append_%s" % tar_table
         self.tar_columns = tar_columns
-        self.tar_pre_sql = tar_pre_sql
-
-        self.log.info("Source connection: {}:{}/{}".format(self.src_conn.host, self.src_conn.port, self.src_conn.schema))
-        self.log.info("Target connection: {}:{}/{}".format(self.tar_conn.host, self.tar_conn.port, self.tar_conn.schema))
-
-    def Popen(self, cmd, **kwargs):
-        """
-        Remote Popen
-
-        :param cmd: command to remotely execute
-        :param kwargs: extra arguments to Popen (see subprocess.Popen)
-        :return: handle to subprocess
-        """
-        self.sp = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            **kwargs)
-
-        for line in iter(self.sp.stdout):
-            self.log.info(line.strip().decode('utf-8'))
-
-        self.sp.wait()
-
-        self.log.info("Command exited with return code %s", self.sp.returncode)
-
-        if self.sp.returncode:
-            raise AirflowException("Execute command failed")
-
-    def generate_setting(self):
-        """
-         datax速度等设置
-        """
-        self.setting = {
-            "speed": {
-                 "byte": 104857600
-            },
-            "errorLimit": {
-                "record": 0,
-                "percentage": 0.02
-            }
-        }
-        return self.setting
-
-    def generate_reader(self):
-        """
-        datax reader
-        """
-        conn = self.src_conn
-        conn_type = 'mysql'
-        reader_name = 'mysqlreader'
-        if(conn.conn_type == 'postgres'):
-            conn_type = 'postgresql'
-            reader_name = 'postgresqlreader'
-
-        self.src_jdbc_url = "jdbc:"+conn_type+"://"+conn.host.strip()+":" + str(conn.port) + "/" + conn.schema.strip()
-        self.reader = {
-            "name": reader_name,
-            "parameter": {
-                "username": conn.login.strip(),
-                "password": conn.password.strip(),
-                "connection": [
-                    {
-                        "querySql": [
-                            self.src_query_sql
-                        ],
-                        "jdbcUrl": [
-                            self.src_jdbc_url
-                        ]
-                    }
-                ]
-            }
-        }
-
-        return self.reader
-
-    def generate_writer(self):
-        conn = self.tar_conn
-        conn_type = 'mysql'
-        reader_name = 'mysqlreader'
-        if(conn.conn_type == 'postgres'):
-            conn_type = 'postgresql'
-            reader_name = 'postgresqlreader'
-
-        self.tar_jdbc_url = "jdbc:"+conn_type+"://"+conn.host.strip()+":" + str(conn.port) + "/" + conn.schema.strip()
-        self.writer = {
-            "name": "postgresqlwriter",
-            "parameter": {
-                "username": conn.login.strip(),
-                "password": conn.password.strip(),
-                "column": self.tar_columns,
-                "preSql": [
-                    self.tar_pre_sql
-                ],
-                "connection": [{
-                    "jdbcUrl": self.tar_jdbc_url,
-                    "table": [self.tar_table]
-                }]
-            }
-        }
-        return self.writer
-
-    def generate_config(self):
-        content = [{
-            "reader": self.generate_reader(),
-            "writer": self.generate_writer()
-        }]
-
-        job = {
-            "setting": self.generate_setting(),
-            "content": content
-        }
-
-        config = {
-            "job": job
-        }
-
-        self.target_json = json.dumps(config)
-
-        # write json to file
-        self.json_file = '/tmp/datax_json_'+self.task_id + uuid.uuid1().hex
-        # 打开一个文件
-        fo = open(self.json_file, "w")
-        fo.write(self.target_json)
-        fo.close()
-        self.log.info("write config json {}".format(self.json_file))
-        return self.json_file
+        self.append_column = append_column
+        self.max_append_column_value = None
 
     def execute(self, context):
-        self.generate_config()
+        """
+        Execute
+        """
+        self.log.info('RDMS2RDMSOperator execute...')
+        self.task_id = context['task_instance'].dag_id + "#" + context['task_instance'].task_id
 
-        # 上传文件
-        datax_home = '/opt/datax/bin'
-        cmd = ['python', datax_home + '/datax.py', self.json_file]
-        self.Popen(cmd)
-        # 删除配置文件
-        os.remove(self.json_file)
+        self.create_temp_table()
+        self.refresh_max_append_column_value()
+        self.run_datax_job()
+        self.migrate_temp_table_to_tar_table()
+        self.drop_temp_table()
+
+    def refresh_max_append_column_value(self):
+        """
+        刷新增量字段的最大值
+        """
+        sql = "SELECT max(%s) FROM %s"
+        with create_external_session(self.tar_conn) as sess:
+            result = sess.execute(sql, self.append_column, self.tara_table)
+        record = result.fetchone()
+        if record:
+            self.max_append_column_value = record[0]
+        return self.max_append_column_value
+
+    def create_temp_table(self):
+        """
+        创建用于增量同步的临时表
+        """
+        create_sql = "CREATE TABLE %s AS (SELECT * FROM %s WHERE 1=2)"
+        with create_external_session(self.tar_conn) as sess:
+            sess.execute(create_sql, [self.tmp_tar_table, self.tar_table])
+
+    def drop_temp_table(self):
+        """
+        删掉临时表
+        """
+        drop_sql = "DROP TABLE IF EXISTS %s;"
+        with create_external_session(self.tar_conn) as sess:
+            sess.execute(drop_sql, [self.tmp_tar_table])
+
+    def migrate_temp_table_to_tar_table(self):
+        """
+        把数据从临时表迁移到正式表
+        分为两步：
+            1. 把更新的行同步过去
+            2. 把新增的行同步过去
+        """
+        set_caluse = ",".join(["a.%s=b.%s" % (c, c) for c in self.tar_columns])
+        update_sql = "UPDATE %s a SET %s FROM %s b WHERE a.id=b.id AND a.id in (SELECT id FROM %s)"
+        insert_sql = "INSERT INTO %s (SELECT * FROM %s tmp WHERE not exists (SELECT id FROM %s WHERE id=tmp.id));"
+        with create_external_session(self.tar_conn) as sess:
+            sess.execute(update_sql, [self.tar_table, set_caluse,
+                                      self.tmp_tar_table, self.tmp_tar_table])
+            sess.execute(insert_sql, [self.tar_table, self.tmp_tar_table,
+                                      self.tar_table])
+
+    def trans_conn_to_datax_conn(self, conn):
+        return DataXConnectionInfo(
+            conn.conn_type,
+            conn.host.strip(),
+            str(conn.port),
+            conn.schema.strip(),
+            conn.login.strip(),
+            conn.password.strip(),
+        )
+
+    def generat_new_src_query_sql(self):
+        if not self.max_append_column_value:
+            return self.src_query_sql
+        sql = "SELECT * FROM ({}) WHERE {} >= '{}'"
+        return sql.format(self.src_query_sql,
+                          self.append_column,
+                          self.max_append_column_value)
+
+    def generate_new_tar_pre_sql(self):
+        return ""
+
+    def run_datax_job(self):
+        job = RDMS2RDMSDataXJob(self.task_id,
+                                self.trans_conn_to_datax_conn(self.src_conn),
+                                self.trans_conn_to_datax_conn(self.tar_conn),
+                                self.generat_new_src_query_sql(),
+                                self.tar_table,
+                                self.tar_columns,
+                                self.generate_new_tar_pre_sql())
+        job.execute()
 
 
 # Will show up under airflow.sensors.test_plugin.PluginSensorOperator
@@ -546,7 +570,7 @@ class DataXPlugin(AirflowPlugin):
     name = "datax"
     operators = [RDMS2RDMSOperator]
     sensors = [PluginSensorOperator]
-    hooks = [RDBMS2RDBMSHook]
+    hooks = [RDBMS2RDBMSFullHook, RDBMS2RDBMSAppendHook]
     executors = [PluginExecutor]
     macros = [plugin_macro]
     # admin_views = [datax_view]
