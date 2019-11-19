@@ -67,10 +67,10 @@ li.li_label {
 .sub_select_li .bootstrap-select {
     width: 80%!important;
 }
-.filed_li {
+.field_li {
     margin-bottom: 15px;
 }
-.filed_li .glyphicon-remove {
+.field_li .glyphicon-remove {
     margin-left: 5px;
 }
 .add_new_field {
@@ -88,4 +88,23 @@ li.li_label {
 }
 .save_sub_task {
     width: 100px;
+}
+.dropdown-toggle {
+    border-color: #cccccc!important;
+}
+.input_sql_wrapper .bootstrap-select {
+    width: 30%!important;
+}
+#sql_input_select .dropdown-toggle {
+    width: 80%;
+}
+.input_sql_wrapper textarea {
+    margin-top: 8px!important;
+}
+.time_interval_input {
+    width: 30%!important;
+}
+.time_interval_select {
+    width: 20%!important;
+    margin-left: 10px!important;
 }
