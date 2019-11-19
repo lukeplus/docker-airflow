@@ -1,0 +1,240 @@
+{% extends "appbuilder/baselayout.html" %}
+
+{% block head_css %}
+{{ super() }}
+    <link rel="stylesheet" type="text/css" href="{{ url_for('datax.static', filename='css/add_task.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('datax.static', filename='select/select.css') }}">
+{% endblock %}
+
+{% block head_js %}
+{{ super() }}
+    <script src="{{ url_for('datax.static', filename='select/select.js') }}"></script>
+    <script src="{{ url_for('datax.static', filename='js/sub_task_card.js') }}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="add_task_wrapper">
+    <h3>编辑任务</h3>
+    <ul class="add_task_head">
+        <li class="li_label">
+            <label class="label_left">任务名称</label>
+            <input type="text" class="head_input form-control task_name" value="{{dag.name}}">
+        </li>
+        <li class="li_label">
+            <label class="label_left">同步类型</label>
+            <select id="sync_type_select" name="state" class="head_input selectpicker bs-select-hidden">
+                {% for v in sync_types %}
+                <option value="{{v}}" {%if dag.sync_type==v %} selected = "selected" {%endif%}>{{v}}</option>
+                {% endfor %}
+            </select>
+        </li>
+        <li class="li_label">
+            <label class="label_left">时间间隔</label>
+            <input type="text" class="time_interval_input form-control" value="{{dag.interval_time}}">
+            <select name="state" class="time_interval_select selectpicker bs-select-hidden">
+                <option value="d" {% if dag.interval_time_type== 'd' %}selected = "selected"{%endif%}>天</option>
+                <option value="h" {% if dag.interval_time_type== 'h' %}selected = "selected"{%endif%}>时</option>
+                <option value="m" {% if dag.interval_time_type== 'm' %}selected = "selected"{%endif%}>分</option>
+                <option value="s" {% if dag.interval_time_type== 's' %}selected = "selected"{%endif%}>秒</option>
+            </select>
+        </li>
+    </ul>
+    <ul class="subtask_list_wrapper"">
+    {% for task in dag.task %}
+        <li class="subtask_list_card">
+            <div class="subtask_list_card_title">
+                <h4>+    子任务</h4>
+                <span class="glyphicon glyphicon-remove remove_sub_task"></span>
+            </div>
+            <div>
+                <ul class="subtask_list_card_nav">
+                    <li class="li_label">
+                        <label class="label_left">子任务名称</label>
+                        <input type="text" class="head_input form-control sub_task_name" value="{{task.name}}">
+                    </li>
+                    <li class="li_label">
+                        <label class="label_left">前置任务</label>
+                        <select name="state" class="head_input selectpicker pre_task_select">
+                            <option value="{{task.pre_task}}" selected = "selected">{{task.pre_task}}</option>
+                        </select>
+                    </li>
+                    <li class="li_label"></li>
+                </ul>
+                <ul class="subtask_list_content">
+                    <li class="subtask_list_item">
+                        <ul class="nav nav-tabs">
+                            <li role="presentation" class="active">
+                                <a data-toggle="tab" disable_anchor="true" role="tab" aria-expanded="true">输入SQL</a>
+                            </li>
+                        </ul>
+                        <div class="tab-content nav nav-tabs">
+                            <div role="tabpanel" class="tab-pane active input_sql_wrapper">
+                                <select name="state" class="head_input selectpicker bs-select-hidden sql_input_select"></select>
+                                <textarea class="form-control sql_input_area" rows="8" name="textarea">{{task.source.query_sql}}</textarea>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="subtask_list_item">
+                        <ul class="nav nav-tabs">
+                            <li role="presentation" class="active">
+                                <a data-toggle="tab" disable_anchor="true" role="tab" aria-expanded="true">目的库</a>
+                            </li>
+                        </ul>
+                        <div class="tab-content nav nav-tabs">
+                            <div role="tabpanel" class="tab-pane active target_field_wrap">
+                                <ul class="sub_select_zone">
+                                    <li class="sub_select_li li_left">
+                                        <select name="state" class="head_input selectpicker target_field_connection"></select>
+                                    </li>
+                                    <li class="sub_select_li li_center">
+                                        <select name="state" class="head_input selectpicker target_field_table"></select>
+                                    </li>
+                                    <li class="sub_select_li li_right">
+                                        <ul class="field_wrapper target_field_column_wrap">
+                                            <li class="field_li">
+                                                <select name="state" class="head_input selectpicker"></select>
+                                                <span class="glyphicon glyphicon-remove remove_field_li"></span>
+                                            </li>
+                                            <li class="field_li">
+                                                <select name="state" class="head_input selectpicker"></select>
+                                                <span class="glyphicon glyphicon-remove remove_field_li"></span>
+                                            </li>
+                                            <li class="field_li">
+                                                <select name="state" class="head_input selectpicker"></select>
+                                                <span class="glyphicon glyphicon-remove remove_field_li"></span>
+                                            </li>
+                                        </ul>
+                                    </li>
+                                </ul>
+                                <button class="btn btn-primary add_new_field">+添加新字段</button>
+                            </div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </li>
+        {%endfor%}
+    </ul>
+    <div class="save_sub_btn_wrap">
+        <button class="btn btn-primary add_new_sub_task">添加子任务</button>
+        <button class="btn btn-primary save_sub_task">保存</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block add_tail_js %}
+    <script>
+        var getConnectionsUrl = 'http://localhost:8080/datax/api/connections';
+        var getTablesUrl = 'http://localhost:8080/datax/api/connection/pg_local_erp_sale/tables';
+        var getColumnsUrl = 'http://localhost:8080/datax/api/connection/pg_local_erp_sale/table/sale_order/columns';
+        var postTaskUrl = 'http://localhost:8080/datax/api/syncdags';
+        var connectionsData = [];
+        var tablesData = [];
+        var columnsData = [];
+        var preTaskNames = [];
+
+        function formatData(data) {
+            var formatedData = [];
+            $.each(data, function(index, item) {
+                formatedData.push({label: item, value: item});
+            });
+            return formatedData;
+        }
+
+        function formatColumnsData(data) {
+            var formatedData = [];
+            $.each(data, function(index, item) {
+                formatedData.push({label: item.column_name, value: item.column_name});
+            });
+            return formatedData;
+        }
+        //全部完成后
+        $.when($.ajax({
+            url: getConnectionsUrl,
+            cache: false}),
+            $.ajax({
+            url: getTablesUrl,
+            cache: false}), $.ajax({
+            url: getColumnsUrl,
+            cache: false})).then(function (res1, res2, res3) {
+                connectionsData = formatData(res1[0].connections);
+                tablesData = formatData(res2[0].tables);
+                columnsData = formatColumnsData(res3[0].tables);
+                var taskCard = $('.subtask_list_wrapper').subTaskCard({
+                    ele: $('.subtask_list_wrapper'),
+                    data: [connectionsData, tablesData, columnsData],
+                });
+                subTaskNameInputBlur(taskCard.$ele.find('.sub_task_name'));
+        }, function() {
+            alert('请求失败，请刷新页面重试');
+        })
+        // 绑定添加子任务事件
+        $('.add_new_sub_task').click(function() {
+            var taskCard = $('.subtask_list_wrapper').subTaskCard({
+                ele: $('.subtask_list_wrapper'),
+                data: [connectionsData, connectionsData, connectionsData],
+            });
+            subTaskNameInputBlur(taskCard.$ele.find('.sub_task_name'));
+        });
+
+        // 子任务名称填写失焦
+        function subTaskNameInputBlur(ele) {
+            ele.blur(function() {
+                var subTaskNames = $('.sub_task_name');
+                if (subTaskNames.length > 1) {
+                    preTaskNames = [];
+                    $.each(subTaskNames, function(idx, item){
+                        var nameVal = $(item).val();
+                        preTaskNames.push({label: nameVal, value: nameVal});
+                    });
+                    $.each($('.pre_task_select'), function(index, select){
+                        var $select = $(select);
+                        $select.selectpicker('initSelectOption', {
+                            idKey: 'value',
+                            nameKey: 'label',
+                            data: preTaskNames
+                        });
+                    });
+                }
+            });
+        }
+
+        // 保存事件
+        $('.save_sub_task').click(function(){
+            postTaskData();
+        });
+
+        // 提交页面数据
+        function postTaskData() {
+            var data = {};
+            data.name = $('.task_name').val();
+            data.sync_type = $('#sync_type_select').val();
+            data.interval = $('.time_interval_input').val() + $('.time_interval_select').val();
+            var tasks = [];
+            $.each($('.subtask_list_card'), function(index, card){
+                var subTask = {};
+                var $card = $(card);
+                subTask.name = $card.find('.sub_task_name').val();
+                subTask.pre_task = $card.find('.pre_task_select').val();
+                subTask.source = {
+                    'comm_id': $card.find('.sql_input_select').val(),
+                    'query_sql': $card.find('.sql_input_area').val()
+                };
+                var columns = $.map($card.find('.target_field_column_wrap select'), function(value){
+                    return $(value).val();
+                });
+                subTask.target = {
+                    "conn_id": $card.find('.target_field_connection').val(),
+                    "table": $card.find('.target_field_table').val(),
+                    "columns": columns
+                };
+                tasks.push(subTask);
+            });
+            data.tasks = tasks;
+            $.post(postTaskUrl, data, function(){
+                // 提交成功后待做的操作
+            });
+        }
+
+    </script>
+{% endblock %}

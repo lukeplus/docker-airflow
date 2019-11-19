@@ -491,7 +491,7 @@ def get_connections(session=None):
 @csrf.exempt
 @provide_session
 def get_tables(conn_id, session=None):
-    conn = session.query(Connection).filter_by(conn_id=conn_id).one()
+    conn = session.query(Connection).filter_by(conn_id=conn_id).first()
     if not conn:
         return jsonify({
             "code": -1,
@@ -511,7 +511,7 @@ def get_tables(conn_id, session=None):
 @csrf.exempt
 @provide_session
 def get_columns(conn_id, table_name, session=None):
-    conn = session.query(Connection).filter_by(conn_id=conn_id).one()
+    conn = session.query(Connection).filter_by(conn_id=conn_id).first()
     if not conn:
         return jsonify({
             "code": -1,
@@ -555,6 +555,22 @@ class DataXDAGView(AppBuilderBaseView):
     @expose('/create')
     def dag_add_page(self):
         return self.render_template("datax/add_task.html",
+                                    sync_types=SYNC_TYPES)
+
+    @expose('/modify/<dag_id>')
+    @provide_session
+    def dag_modify_page(self, dag_id, session=None):
+        dag = session.query(SyncDAGModel).get(dag_id)
+        data = dag.to_json()
+
+        matcher = re.compile("^(\d+)([s|h|d|ms])$").match(data["interval"])
+        if matcher:
+            interval_time, interval_time_type = matcher.groups()
+            data["interval_time"] = interval_time
+            data["interval_time_type"] = interval_time_type
+
+        return self.render_template("datax/modify_task.html",
+                                    dag=data,
                                     sync_types=SYNC_TYPES)
 
 
