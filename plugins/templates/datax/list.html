@@ -36,8 +36,9 @@
                         <td>{{dag.state}}</td>
                         <td>
                             <a class="operate_btn" href="#">查看</a>
-                            <a class="operate_btn">编辑</a>
-                            <a class="operate_btn">禁用</a>
+                            <a data-id="{{ dag.name }}" class="operate_btn">编辑</a>
+                            <a data-id="{{ dag.name }}" class="operate_btn forbid_task">禁用</a>
+                            <a data-id="{{ dag.name }}" class="operate_btn delete_task">删除</a>
                         </td>
                     </tr>
                     {%endfor%}
@@ -96,8 +97,23 @@
 {% block tail %}
 {{ super() }}
 <script>
-  $( document ).ready(function() {
-
-  });
+    var deleteUrl = "http://localhost:8080/datax/api/syncdag/";
+    $( document ).ready(function() {
+        $('.delete_task').click(function(ev){
+            var id = ev.target.dataset.id;
+            if(confirm("你确定要删除'"+id+"' 这条任务吗?")) {
+                $.ajax({
+                    url: deleteUrl+id,
+                    type: "DELETE",
+                    success: function(result){
+                        location.reload();
+                    },
+                    error: function() {
+                        alert('删除失败，请重试！');
+                    }   
+                });
+            }
+        });
+    });
 </script>
 {% endblock %}
