@@ -158,7 +158,11 @@
                 columnsData = formatColumnsData(res3[0].tables);
                 var taskCard = $('.subtask_list_wrapper').subTaskCard({
                     ele: $('.subtask_list_wrapper'),
-                    data: [connectionsData, tablesData, columnsData],
+                    data: {
+                        connectionsData: connectionsData,
+                        tablesData: tablesData,
+                        columnsData: columnsData,
+                    },
                 });
                 subTaskNameInputBlur(taskCard.$ele.find('.sub_task_name'));
         }, function() {
@@ -168,7 +172,11 @@
         $('.add_new_sub_task').click(function() {
             var taskCard = $('.subtask_list_wrapper').subTaskCard({
                 ele: $('.subtask_list_wrapper'),
-                data: [connectionsData, connectionsData, connectionsData],
+                data: {
+                        connectionsData: connectionsData,
+                        tablesData: tablesData,
+                        columnsData: columnsData,
+                    }
             });
             subTaskNameInputBlur(taskCard.$ele.find('.sub_task_name'));
         });

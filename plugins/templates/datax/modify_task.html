@@ -18,7 +18,7 @@
     <ul class="add_task_head">
         <li class="li_label">
             <label class="label_left">任务名称</label>
-            <input type="text" class="head_input form-control task_name" value="{{dag.name}}">
+            <input type="text" readonly class="head_input form-control task_name" value="{{dag.name}}">
         </li>
         <li class="li_label">
             <label class="label_left">同步类型</label>
@@ -29,91 +29,18 @@
             </select>
         </li>
         <li class="li_label">
-            <label class="label_left">时间间隔</label>
-            <input type="text" class="time_interval_input form-control" value="{{dag.interval_time}}">
-            <select name="state" class="time_interval_select selectpicker bs-select-hidden">
-                <option value="d" {% if dag.interval_time_type== 'd' %}selected = "selected"{%endif%}>天</option>
-                <option value="h" {% if dag.interval_time_type== 'h' %}selected = "selected"{%endif%}>时</option>
-                <option value="m" {% if dag.interval_time_type== 'm' %}selected = "selected"{%endif%}>分</option>
-                <option value="s" {% if dag.interval_time_type== 's' %}selected = "selected"{%endif%}>秒</option>
-            </select>
-        </li>
+                <label class="label_left">时间间隔</label>
+                <input type="text" class="time_interval_input form-control" value="{{dag.interval_time}}">
+                <select name="state" class="time_interval_select selectpicker bs-select-hidden">
+                    <option value="d" {% if dag.interval_time_type== 'd' %}selected = "selected"{%endif%}>天</option>
+                    <option value="h" {% if dag.interval_time_type== 'h' %}selected = "selected"{%endif%}>时</option>
+                    <option value="m" {% if dag.interval_time_type== 'm' %}selected = "selected"{%endif%}>分</option>
+                    <option value="s" {% if dag.interval_time_type== 's' %}selected = "selected"{%endif%}>秒</option>
+                </select>
+            </li>
     </ul>
     <ul class="subtask_list_wrapper"">
-    {% for task in dag.task %}
-        <li class="subtask_list_card">
-            <div class="subtask_list_card_title">
-                <h4>+    子任务</h4>
-                <span class="glyphicon glyphicon-remove remove_sub_task"></span>
-            </div>
-            <div>
-                <ul class="subtask_list_card_nav">
-                    <li class="li_label">
-                        <label class="label_left">子任务名称</label>
-                        <input type="text" class="head_input form-control sub_task_name" value="{{task.name}}">
-                    </li>
-                    <li class="li_label">
-                        <label class="label_left">前置任务</label>
-                        <select name="state" class="head_input selectpicker pre_task_select">
-                            <option value="{{task.pre_task}}" selected = "selected">{{task.pre_task}}</option>
-                        </select>
-                    </li>
-                    <li class="li_label"></li>
-                </ul>
-                <ul class="subtask_list_content">
-                    <li class="subtask_list_item">
-                        <ul class="nav nav-tabs">
-                            <li role="presentation" class="active">
-                                <a data-toggle="tab" disable_anchor="true" role="tab" aria-expanded="true">输入SQL</a>
-                            </li>
-                        </ul>
-                        <div class="tab-content nav nav-tabs">
-                            <div role="tabpanel" class="tab-pane active input_sql_wrapper">
-                                <select name="state" class="head_input selectpicker bs-select-hidden sql_input_select"></select>
-                                <textarea class="form-control sql_input_area" rows="8" name="textarea">{{task.source.query_sql}}</textarea>
-                            </div>
-                        </div>
-                    </li>
-                    <li class="subtask_list_item">
-                        <ul class="nav nav-tabs">
-                            <li role="presentation" class="active">
-                                <a data-toggle="tab" disable_anchor="true" role="tab" aria-expanded="true">目的库</a>
-                            </li>
-                        </ul>
-                        <div class="tab-content nav nav-tabs">
-                            <div role="tabpanel" class="tab-pane active target_field_wrap">
-                                <ul class="sub_select_zone">
-                                    <li class="sub_select_li li_left">
-                                        <select name="state" class="head_input selectpicker target_field_connection"></select>
-                                    </li>
-                                    <li class="sub_select_li li_center">
-                                        <select name="state" class="head_input selectpicker target_field_table"></select>
-                                    </li>
-                                    <li class="sub_select_li li_right">
-                                        <ul class="field_wrapper target_field_column_wrap">
-                                            <li class="field_li">
-                                                <select name="state" class="head_input selectpicker"></select>
-                                                <span class="glyphicon glyphicon-remove remove_field_li"></span>
-                                            </li>
-                                            <li class="field_li">
-                                                <select name="state" class="head_input selectpicker"></select>
-                                                <span class="glyphicon glyphicon-remove remove_field_li"></span>
-                                            </li>
-                                            <li class="field_li">
-                                                <select name="state" class="head_input selectpicker"></select>
-                                                <span class="glyphicon glyphicon-remove remove_field_li"></span>
-                                            </li>
-                                        </ul>
-                                    </li>
-                                </ul>
-                                <button class="btn btn-primary add_new_field">+添加新字段</button>
-                            </div>
-                        </div>
-                    </li>
-                </ul>
-            </div>
-        </li>
-        {%endfor%}
+        
     </ul>
     <div class="save_sub_btn_wrap">
         <button class="btn btn-primary add_new_sub_task">添加子任务</button>
@@ -127,11 +54,14 @@
         var getConnectionsUrl = 'http://localhost:8080/datax/api/connections';
         var getTablesUrl = 'http://localhost:8080/datax/api/connection/pg_local_erp_sale/tables';
         var getColumnsUrl = 'http://localhost:8080/datax/api/connection/pg_local_erp_sale/table/sale_order/columns';
-        var postTaskUrl = 'http://localhost:8080/datax/api/syncdags';
+        var dagUrl = 'http://localhost:8080/datax/api/syncdag/';
         var connectionsData = [];
         var tablesData = [];
         var columnsData = [];
+        var tasks = [];
         var preTaskNames = [];
+        var hrefArr = location.href.split('/');
+        var taskName = hrefArr[hrefArr.length - 1];
 
         function formatData(data) {
             var formatedData = [];
@@ -148,6 +78,7 @@
             });
             return formatedData;
         }
+
         //全部完成后
         $.when($.ajax({
             url: getConnectionsUrl,
@@ -156,23 +87,45 @@
             url: getTablesUrl,
             cache: false}), $.ajax({
             url: getColumnsUrl,
-            cache: false})).then(function (res1, res2, res3) {
+            cache: false}), $.ajax({
+                url: dagUrl + taskName,
+                cache: false
+            })).then(function (res1, res2, res3, res4) {
                 connectionsData = formatData(res1[0].connections);
                 tablesData = formatData(res2[0].tables);
                 columnsData = formatColumnsData(res3[0].tables);
-                var taskCard = $('.subtask_list_wrapper').subTaskCard({
-                    ele: $('.subtask_list_wrapper'),
-                    data: [connectionsData, tablesData, columnsData],
-                });
-                subTaskNameInputBlur(taskCard.$ele.find('.sub_task_name'));
+                tasks = res4[0].tasks;
+                if (tasks.length) {
+                    $.each(tasks, function(index, task){
+                        var taskCard = $('.subtask_list_wrapper').subTaskCard({
+                            ele: $('.subtask_list_wrapper'),
+                            data: {
+                                connectionsData: connectionsData,
+                                tablesData: tablesData,
+                                columnsData: columnsData,
+                                tasks: res4[0].tasks
+                            }
+                        });
+                        subTaskNameInputBlur(taskCard.$ele.find('.sub_task_name'));
+                        taskCard.setRowValue(task);
+                    });
+                    addPreTaskOptions();
+                    setPreTaskValue();
+                }
+                
         }, function() {
             alert('请求失败，请刷新页面重试');
         })
+
         // 绑定添加子任务事件
         $('.add_new_sub_task').click(function() {
             var taskCard = $('.subtask_list_wrapper').subTaskCard({
                 ele: $('.subtask_list_wrapper'),
-                data: [connectionsData, connectionsData, connectionsData],
+                data: {
+                        connectionsData: connectionsData,
+                        tablesData: tablesData,
+                        columnsData: columnsData,
+                    }
             });
             subTaskNameInputBlur(taskCard.$ele.find('.sub_task_name'));
         });
@@ -180,25 +133,35 @@
         // 子任务名称填写失焦
         function subTaskNameInputBlur(ele) {
             ele.blur(function() {
-                var subTaskNames = $('.sub_task_name');
-                if (subTaskNames.length > 1) {
-                    preTaskNames = [];
-                    $.each(subTaskNames, function(idx, item){
-                        var nameVal = $(item).val();
-                        preTaskNames.push({label: nameVal, value: nameVal});
-                    });
-                    $.each($('.pre_task_select'), function(index, select){
-                        var $select = $(select);
-                        $select.selectpicker('initSelectOption', {
-                            idKey: 'value',
-                            nameKey: 'label',
-                            data: preTaskNames
-                        });
-                    });
-                }
+                addPreTaskOptions();
             });
         }
 
+        function addPreTaskOptions() {
+            var subTaskNames = $('.sub_task_name');
+            if (subTaskNames.length > 1) {
+                preTaskNames = [];
+                $.each(subTaskNames, function(idx, item){
+                    var nameVal = $(item).val();
+                    preTaskNames.push({label: nameVal, value: nameVal});
+                });
+                $.each($('.pre_task_select'), function(index, select){
+                    var $select = $(select);
+                    $select.selectpicker('initSelectOption', {
+                        idKey: 'value',
+                        nameKey: 'label',
+                        data: preTaskNames
+                    });
+                });
+            }
+        }
+
+        function setPreTaskValue() {
+            $.each($('select.pre_task_select'), function(index, select){
+                $(select).selectpicker('val', tasks[index].pre_task);
+            });
+        }
+        
         // 保存事件
         $('.save_sub_task').click(function(){
             postTaskData();
@@ -207,7 +170,6 @@
         // 提交页面数据
         function postTaskData() {
             var data = {};
-            data.name = $('.task_name').val();
             data.sync_type = $('#sync_type_select').val();
             data.interval = $('.time_interval_input').val() + $('.time_interval_select').val();
             var tasks = [];
@@ -231,10 +193,20 @@
                 tasks.push(subTask);
             });
             data.tasks = tasks;
-            $.post(postTaskUrl, data, function(){
-                // 提交成功后待做的操作
+            $.ajax({
+                url: dagUrl + taskName,
+                type: "PUT",
+                contentType: "application/json",//设置请求参数类型为json字符串
+                data: JSON.stringify(data),//将json对象转换成json字符串发送
+                dataType:"json",
+                success: function(result){
+                    // 成功后的操作
+                },
+                error: function() {
+                    alert('更新失败，请重试！');
+                }  
             });
         }
-
+        
     </script>
 {% endblock %}

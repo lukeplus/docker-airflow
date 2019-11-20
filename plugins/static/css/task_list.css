@@ -13,6 +13,7 @@
 .search_btn {
     margin-top: -3px;
     margin-left: 20px;
+    border-color: #cccccc!important;
 }
 .search_input {
     width: 40%;

@@ -6,6 +6,9 @@
             init: function(options) {
                 this.$root = options.ele;
                 this.selectData = options.data;
+                this.createFullView();
+            },
+            createFullView: function() {
                 this.$ele = this.createView();
                 this.append();
                 this.attachPicker();
@@ -99,9 +102,9 @@
                 this.attachClickEvent();
             },
             attachPicker: function() {
-                this.attachPickerConnection(this.selectData[0]);
-                this.attachPickerTable(this.selectData[1]);
-                this.attachPickerColumn(this.selectData[2]);
+                this.attachPickerConnection(this.selectData.connectionsData);
+                this.attachPickerTable(this.selectData.tablesData);
+                this.attachPickerColumn(this.selectData.columnsData);
             },
             attachPickerConnection: function(data) {
                 this.$ele.find('.sql_input_select').selectpicker('initSelectOption', {
@@ -140,14 +143,48 @@
                     $(ev.target).parents('.field_li').remove();
                 });
                 this.$ele.find('.add_new_field').click(function(ev){
-                    var $subFieldLi = $(self.subFieldLiTemplate());
-                    $(ev.target).parents('.target_field_wrap').find('.target_field_column_wrap').append($subFieldLi);
-                    
-                    $subFieldLi.find('select').selectpicker('initSelectOption', {
-                        idKey: 'value',
-                        nameKey: 'label',
-                        data: self.selectData[2]
-                    });
+                    var newFieldWrap = $(ev.target).parents('.target_field_wrap').find('.target_field_column_wrap');
+                    self.addNewField(newFieldWrap);
+                });
+            },
+            addNewField: function ($wrap){
+                var self = this;
+                var $subFieldLi = $(self.subFieldLiTemplate());
+                $wrap.append($subFieldLi);
+                
+                $subFieldLi.find('select').selectpicker('initSelectOption', {
+                    idKey: 'value',
+                    nameKey: 'label',
+                    data: self.selectData.columnsData
+                });
+            },
+            setRowValue: function(rowValue) {
+                var $row = this.$ele;
+                $row.find('.sub_task_name').val(rowValue.name);
+                $row.find('.pre_task_select').selectpicker('val', rowValue.pre_task);
+                $row.find('.sql_input_select').selectpicker('val', rowValue.source.conn_id);
+                $row.find('.sql_input_area').val(rowValue.source.query_sql);
+                $row.find('.target_field_connection').selectpicker('val', rowValue.target.conn_id);
+                $row.find('.target_field_connection').selectpicker('val', rowValue.target.conn_id);
+                $row.find('.target_field_table').selectpicker('val', rowValue.target.table);
+                var $columns = $row.find('.target_field_column_wrap .selectpicker');
+                var $columnWrap = $row.find('.target_field_column_wrap');
+                var columns = rowValue.target.columns;
+                if (!columns.length) {
+                    $columnWrap.empty();
+                } else if (columns.length > $columns.length) {
+                    for (var i = 0; i < columns.length - $columns.length; i++) {
+                        this.addNewField($columnWrap);
+                    }
+                }
+                $.each($row.find('.target_field_column_wrap .field_li'), function(index, dom){
+                    var columnVal = rowValue.target.columns[index];
+                    var $dom = $(dom);
+                    if (columnVal) {
+                        $dom.find('.selectpicker').selectpicker('val', columnVal);
+                    } else {
+                        $dom.remove();
+                    }
                 });
             }
         };
