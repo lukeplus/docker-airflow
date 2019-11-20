@@ -120,63 +120,18 @@
 
 {% block add_tail_js %}
     <script>
-        var getConnectionsUrl = 'http://localhost:8080/datax/api/connections';
-        var getTablesUrl = 'http://localhost:8080/datax/api/connection/pg_local_erp_sale/tables';
-        var getColumnsUrl = 'http://localhost:8080/datax/api/connection/pg_local_erp_sale/table/sale_order/columns';
         var postTaskUrl = 'http://localhost:8080/datax/api/syncdags';
-        var connectionsData = [];
-        var tablesData = [];
-        var columnsData = [];
         var preTaskNames = [];
-
-        function formatData(data) {
-            var formatedData = [];
-            $.each(data, function(index, item) {
-                formatedData.push({label: item, value: item});
-            });
-            return formatedData;
-        }
-
-        function formatColumnsData(data) {
-            var formatedData = [];
-            $.each(data, function(index, item) {
-                formatedData.push({label: item.column_name, value: item.column_name});
-            });
-            return formatedData;
-        }
-        //全部完成后
-        $.when($.ajax({
-            url: getConnectionsUrl,
-            cache: false}),
-            $.ajax({
-            url: getTablesUrl,
-            cache: false}), $.ajax({
-            url: getColumnsUrl,
-            cache: false})).then(function (res1, res2, res3) {
-                connectionsData = formatData(res1[0].connections);
-                tablesData = formatData(res2[0].tables);
-                columnsData = formatColumnsData(res3[0].tables);
-                var taskCard = $('.subtask_list_wrapper').subTaskCard({
-                    ele: $('.subtask_list_wrapper'),
-                    data: {
-                        connectionsData: connectionsData,
-                        tablesData: tablesData,
-                        columnsData: columnsData,
-                    },
-                });
-                subTaskNameInputBlur(taskCard.$ele.find('.sub_task_name'));
-        }, function() {
-            alert('请求失败，请刷新页面重试');
-        })
+        var taskCard = $('.subtask_list_wrapper').subTaskCard({
+            ele: $('.subtask_list_wrapper'),
+        });
+        
+        subTaskNameInputBlur(taskCard.$ele.find('.sub_task_name'));
+       
         // 绑定添加子任务事件
         $('.add_new_sub_task').click(function() {
             var taskCard = $('.subtask_list_wrapper').subTaskCard({
                 ele: $('.subtask_list_wrapper'),
-                data: {
-                        connectionsData: connectionsData,
-                        tablesData: tablesData,
-                        columnsData: columnsData,
-                    }
             });
             subTaskNameInputBlur(taskCard.$ele.find('.sub_task_name'));
         });

@@ -4,15 +4,115 @@
         };
         SubTaskCard.prototype = {
             init: function(options) {
+                this.getConnectionsUrl = 'http://localhost:8080/datax/api/connections';
+                this.baseUrl = 'http://localhost:8080/datax/api/connection/';
+                this.connectionsVal = '';
+                this.connectionsData = [];
+                this.tablesData = [];
+                this.columnsData = [];
                 this.$root = options.ele;
-                this.selectData = options.data;
+                this.task = options.task;
+                this.getConnectionsData();
                 this.createFullView();
+                this.initChange();
+            },
+            initChange: function() {
+                var self = this;
+                this.$ele.find('select.target_field_connection').on('changed.bs.select', function(e) {
+                    self.connectionsVal = e.target.value;
+                    var url = self.baseUrl + self.connectionsVal + '/tables';
+                    self.getTablesData(url);
+                });
+                this.$ele.find('select.target_field_table').on('changed.bs.select', function(e) {
+                    var value = e.target.value;
+                    var url = self.baseUrl + self.connectionsVal + '/table/' + value + '/columns';
+                    self.getColumnsData(url);
+                });
+            },
+            getConnectionsData: function() {
+                var self = this;
+                $.ajax({
+                    url: self.getConnectionsUrl,
+                    cache: false,
+                    success: function(result){
+                        if (result.code === 0) {
+                            self.connectionsData = self.formatData(result.connections);
+                            self.attachPickerConnection(self.connectionsData);
+                            if (self.task) {
+                                self.setRowConnectionValue(self.task);
+                            }
+                        } else {
+                            alert(result.msg);
+                        }
+                    },
+                    error: function() {
+                        alert('请求失败，请刷新页面重试');
+                    }
+                });
+            },
+            getTablesData: function(url) {
+                var self = this;
+                $.ajax({
+                    url: url,
+                    cache: false,
+                    success: function(result){
+                        if (result.code === 0) {
+                            self.tablesData = self.formatData(result.tables);
+                            self.attachPickerTable(self.tablesData);
+                            if (self.task) {
+                                self.setRowTableValue(self.task);
+                            }
+                        } else {
+                            alert(result.msg);
+                        }
+                    },
+                    error: function() {
+                        alert('请求失败，请刷新页面重试');
+                    }
+                });
+            },
+            getColumnsData: function(url) {
+                var self = this;
+                $.ajax({
+                    url: url,
+                    cache: false,
+                    success: function(result){
+                        if (result.code === 0) {
+                            self.columnsData = self.formatColumnsData(result.tables);
+                            self.attachPickerColumn(self.columnsData);
+                            if (self.task) {
+                                self.setRowColumnValue(self.task);
+                            }
+                        } else {
+                            alert(result.msg);
+                        }
+                    },
+                    error: function() {
+                        alert('请求失败，请刷新页面重试');
+                    }
+                });
+            },
+            formatData: function(data) {
+                var formatedData = [];
+                $.each(data, function(index, item) {
+                    formatedData.push({label: item, value: item});
+                });
+                return formatedData;
+            },
+            formatColumnsData: function(data) {
+                var formatedData = [];
+                $.each(data, function(index, item) {
+                    formatedData.push({label: item.column_name, value: item.column_name});
+                });
+                return formatedData;
             },
             createFullView: function() {
                 this.$ele = this.createView();
                 this.append();
-                this.attachPicker();
                 this.attachEvent();
+                if (this.task) {
+                    this.setRowStaticValue(this.task);
+                }
             },
             template: function() {
                 return '<li class="subtask_list_card">' +
@@ -101,11 +201,6 @@
             attachEvent: function() {
                 this.attachClickEvent();
             },
-            attachPicker: function() {
-                this.attachPickerConnection(this.selectData.connectionsData);
-                this.attachPickerTable(this.selectData.tablesData);
-                this.attachPickerColumn(this.selectData.columnsData);
-            },
             attachPickerConnection: function(data) {
                 this.$ele.find('.sql_input_select').selectpicker('initSelectOption', {
                     idKey: 'value',
@@ -155,18 +250,35 @@
                 $subFieldLi.find('select').selectpicker('initSelectOption', {
                     idKey: 'value',
                     nameKey: 'label',
-                    data: self.selectData.columnsData
+                    data: self.columnsData
                 });
             },
-            setRowValue: function(rowValue) {
+            setRowStaticValue: function(rowValue) {
                 var $row = this.$ele;
                 $row.find('.sub_task_name').val(rowValue.name);
-                $row.find('.pre_task_select').selectpicker('val', rowValue.pre_task);
                 $row.find('.sql_input_select').selectpicker('val', rowValue.source.conn_id);
                 $row.find('.sql_input_area').val(rowValue.source.query_sql);
+            },
+            setRowPreTaskValue: function() {
+                var $row = this.$ele;
+                $row.find('.pre_task_select').selectpicker('val', rowValue.pre_task);
+            },
+            setRowConnectionValue: function(rowValue) {
+                var $row = this.$ele;
                 $row.find('.target_field_connection').selectpicker('val', rowValue.target.conn_id);
-                $row.find('.target_field_connection').selectpicker('val', rowValue.target.conn_id);
+                this.connectionsVal = rowValue.target.conn_id;
+                var url = this.baseUrl + this.connectionsVal + '/tables';
+                this.getTablesData(url);
+            },
+            setRowTableValue: function(rowValue) {
+                var $row = this.$ele;
                 $row.find('.target_field_table').selectpicker('val', rowValue.target.table);
+                var value = rowValue.target.table;
+                var url = this.baseUrl + this.connectionsVal + '/table/' + value + '/columns';
+                this.getColumnsData(url);
+            },
+            setRowColumnValue: function(rowValue) {
+                var $row = this.$ele;
                 var $columns = $row.find('.target_field_column_wrap .selectpicker');
                 var $columnWrap = $row.find('.target_field_column_wrap');
                 var columns = rowValue.target.columns;
@@ -186,7 +298,7 @@
                         $dom.remove();
                     }
                 });
-            }
+            },
         };
         $.fn.subTaskCard = function(options) {
             var taskCard = new SubTaskCard(this, options);
