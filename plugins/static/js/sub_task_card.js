@@ -110,6 +110,7 @@
                 this.$ele = this.createView();
                 this.append();
                 this.attachEvent();
+                this.attachEmptyPicker();
                 if (this.task) {
                     this.setRowStaticValue(this.task);
                 }
@@ -200,6 +201,11 @@
             },
             attachEvent: function() {
                 this.attachClickEvent();
+            },
+            attachEmptyPicker: function() {
+                this.attachPickerConnection([]);
+                this.attachPickerTable([]);
+                this.attachPickerColumn([]);
             },
             attachPickerConnection: function(data) {
                 this.$ele.find('.sql_input_select').selectpicker('initSelectOption', {
