@@ -6,7 +6,7 @@
 
 from datetime import datetime, timedelta
 from airflow import DAG
-from airflow.operators.datax2 import RDMS2RDMSOperator
+from airflow.operators.datax import RDMS2RDMSOperator
 
 
 default_args = {
@@ -30,13 +30,14 @@ dag = DAG(
 {% for t in tasks %}
 
 {{t.name}} = RDMS2RDMSOperator(
+    sync_type='{{sync_type}}',
     task_id="{{t.name}}",
     src_conn_id="{{t.source.conn_id}}",
     src_query_sql="{{t.source.query_sql}}",
     tar_conn_id="{{t.target.conn_id}}",
     tar_table="{{t.target.table}}",
     tar_columns={{t.target.columns}},
-    tar_pre_sql="delete from {{t.target.table}}",
+    append_column='{{append_column}}',
     dag=dag,
 )
 {% endfor %}

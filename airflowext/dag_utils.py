@@ -49,6 +49,8 @@ def generate_dag_file(data):
         partent2child.append((t["pre_task"], t["name"]))
 
     content = template.render(
+        sync_type=data["sync_type"],
+        append_column=data["append_column"],
         name=data["name"],
         owner="luke",
         start_date="datetime(%s, %s, %s)" % (today.year, today.month, today.day),

@@ -73,7 +73,8 @@ def dump_interval(obj):
 class SyncDAGModel(DagModel):
     __tablename__ = 'sync_dag'
     __mapper_args__ = {'polymorphic_identity': 'sync_dag'}
-    sync_dag_id = Column(String(ID_LEN), ForeignKey('dag.dag_id'), primary_key=True)
+    sync_dag_id = Column(String(ID_LEN),
+                         ForeignKey('dag.dag_id'), primary_key=True)
     sync_type = Column(String(50))
     task_json_str = Column(String(5000), default="[]")
 
@@ -83,7 +84,8 @@ class SyncDAGModel(DagModel):
             "sync_type": self.sync_type,
             "interval": dump_interval(self.schedule_interval),
             "state": self.state,
-            "tasks": json.loads(self.task_json_str)
+            "tasks": json.loads(self.task_json_str),
+            "append_column": "write_date",
         }
 
     @property
@@ -243,19 +245,20 @@ class RDBMS2RDBMSAppendHook(BaseHook):
         self.log.info('RDMS2RDMSOperator execute...')
         self.task_id = context['task_instance'].dag_id + "#" + context['task_instance'].task_id
 
+        self.drop_temp_table()
         self.create_temp_table()
         self.refresh_max_append_column_value()
         self.run_datax_job()
         self.migrate_temp_table_to_tar_table()
-        self.drop_temp_table()
+        # self.drop_temp_table()
 
     def refresh_max_append_column_value(self):
         """
         刷新增量字段的最大值
         """
-        sql = "SELECT max(%s) FROM %s"
+        sql = "SELECT max(%s) FROM %s" % (self.append_column, self.tar_table)
         with create_external_session(self.tar_conn) as sess:
-            result = sess.execute(sql, self.append_column, self.tara_table)
+            result = sess.execute(sql)
         record = result.fetchone()
         if record:
             self.max_append_column_value = record[0]
@@ -265,17 +268,18 @@ class RDBMS2RDBMSAppendHook(BaseHook):
         """
         创建用于增量同步的临时表
         """
-        create_sql = "CREATE TABLE %s AS (SELECT * FROM %s WHERE 1=2)"
+        create_sql = "CREATE TABLE %s AS (SELECT * FROM %s WHERE 1=2)" % (self.tmp_tar_table, self.tar_table)
         with create_external_session(self.tar_conn) as sess:
-            sess.execute(create_sql, [self.tmp_tar_table, self.tar_table])
+            sess.execute("DROP TABLE IF EXISTS %s;" % self.tmp_tar_table)
+            sess.execute(create_sql)
 
     def drop_temp_table(self):
         """
         删掉临时表
         """
-        drop_sql = "DROP TABLE IF EXISTS %s;"
+        drop_sql = "DROP TABLE IF EXISTS %s;" % self.tmp_tar_table
         with create_external_session(self.tar_conn) as sess:
-            sess.execute(drop_sql, [self.tmp_tar_table])
+            sess.execute(drop_sql)
 
     def migrate_temp_table_to_tar_table(self):
         """
@@ -284,14 +288,19 @@ class RDBMS2RDBMSAppendHook(BaseHook):
             1. 把更新的行同步过去
             2. 把新增的行同步过去
         """
-        set_caluse = ",".join(["a.%s=b.%s" % (c, c) for c in self.tar_columns])
-        update_sql = "UPDATE %s a SET %s FROM %s b WHERE a.id=b.id AND a.id in (SELECT id FROM %s)"
-        insert_sql = "INSERT INTO %s (SELECT * FROM %s tmp WHERE not exists (SELECT id FROM %s WHERE id=tmp.id));"
+        set_caluse = ",".join(["%s=b.%s" % (c, c) for c in self.tar_columns])
+        data = {
+            "table": self.tar_table,
+            "temp": self.tmp_tar_table,
+            "set_caluse": set_caluse,
+        }
+        update_sql = "UPDATE {table} a SET {set_caluse} FROM {temp} b WHERE a.id=b.id AND a.id in (SELECT id FROM {temp})"
+        insert_sql = "INSERT INTO {table} (SELECT * FROM {temp} tmp WHERE not exists (SELECT id FROM {table} WHERE id=tmp.id));"
+        self.log.info("migrate_temp_table_to_tar_table update_sql: %s", update_sql)
+        self.log.info("migrate_temp_table_to_tar_table insert_sql: %s", insert_sql)
         with create_external_session(self.tar_conn) as sess:
-            sess.execute(update_sql, [self.tar_table, set_caluse,
-                                      self.tmp_tar_table, self.tmp_tar_table])
-            sess.execute(insert_sql, [self.tar_table, self.tmp_tar_table,
-                                      self.tar_table])
+            sess.execute(update_sql.format(**data))
+            sess.execute(insert_sql.format(**data))
 
     def trans_conn_to_datax_conn(self, conn):
         return DataXConnectionInfo(
@@ -306,7 +315,7 @@ class RDBMS2RDBMSAppendHook(BaseHook):
     def generat_new_src_query_sql(self):
         if not self.max_append_column_value:
             return self.src_query_sql
-        sql = "SELECT * FROM ({}) WHERE {} >= '{}'"
+        sql = "SELECT * FROM ({}) as main_ WHERE main_.{} >= '{}'"
         return sql.format(self.src_query_sql,
                           self.append_column,
                           self.max_append_column_value)
@@ -319,7 +328,7 @@ class RDBMS2RDBMSAppendHook(BaseHook):
                                 self.trans_conn_to_datax_conn(self.src_conn),
                                 self.trans_conn_to_datax_conn(self.tar_conn),
                                 self.generat_new_src_query_sql(),
-                                self.tar_table,
+                                self.tmp_tar_table,
                                 self.tar_columns,
                                 self.generate_new_tar_pre_sql())
         job.execute()
@@ -404,6 +413,7 @@ class SyncDAGListView(MethodView):
             fileloc="",
             task_json_str=json.dumps(params["tasks"]),
             is_active=True,
+            is_paused=False,
         )
         session.add(dag)
         session.commit()
