@@ -262,7 +262,6 @@
             setRowStaticValue: function(rowValue) {
                 var $row = this.$ele;
                 $row.find('.sub_task_name').val(rowValue.name);
-                $row.find('.sql_input_select').selectpicker('val', rowValue.source.conn_id);
                 $row.find('.sql_input_area').val(rowValue.source.query_sql);
             },
             setRowPreTaskValue: function() {
@@ -271,6 +270,7 @@
             },
             setRowConnectionValue: function(rowValue) {
                 var $row = this.$ele;
+                $row.find('.sql_input_select').selectpicker('val', rowValue.source.conn_id);
                 $row.find('.target_field_connection').selectpicker('val', rowValue.target.conn_id);
                 this.connectionsVal = rowValue.target.conn_id;
                 var url = this.baseUrl + this.connectionsVal + '/tables';

@@ -98,7 +98,7 @@
         function addPreTaskOptions() {
             var subTaskNames = $('.sub_task_name');
             if (subTaskNames.length > 1) {
-                preTaskNames = [];
+                preTaskNames = [{value: '', label: ''}];
                 $.each(subTaskNames, function(idx, item){
                     var nameVal = $(item).val();
                     preTaskNames.push({label: nameVal, value: nameVal});
