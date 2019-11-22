@@ -97,7 +97,7 @@
 {% block tail %}
 {{ super() }}
 <script>
-    var deleteUrl = "http://localhost:8080/datax/api/syncdag/";
+    var deleteUrl = "/datax/api/syncdag/";
     $( document ).ready(function() {
         $('.delete_task').click(function(ev){
             var id = ev.target.dataset.id;

@@ -4,8 +4,8 @@
         };
         SubTaskCard.prototype = {
             init: function(options) {
-                this.getConnectionsUrl = 'http://localhost:8080/datax/api/connections';
-                this.baseUrl = 'http://localhost:8080/datax/api/connection/';
+                this.getConnectionsUrl = 'http://192.168.100.133:8080/datax/api/connections';
+                this.baseUrl = 'http://192.168.100.133:8080/datax/api/connection/';
                 this.connectionsVal = '';
                 this.connectionsData = [];
                 this.tablesData = [];

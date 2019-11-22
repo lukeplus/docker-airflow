@@ -40,7 +40,7 @@ def generate_dag_file(data):
         tpl_content = f.read()
 
     template = Template(tpl_content)
-    today = dte.today()
+    today = dte.utcnow()
 
     partent2child = []
     for t in data["tasks"]:

@@ -120,7 +120,7 @@
 
 {% block add_tail_js %}
     <script>
-        var postTaskUrl = 'http://localhost:8080/datax/api/syncdags';
+        var postTaskUrl = '/datax/api/syncdags';
         var preTaskNames = [];
         var taskCard = $('.subtask_list_wrapper').subTaskCard({
             ele: $('.subtask_list_wrapper'),
@@ -176,7 +176,7 @@
                 subTask.name = $card.find('.sub_task_name').val();
                 subTask.pre_task = $card.find('.pre_task_select').val();
                 subTask.source = {
-                    'comm_id': $card.find('.sql_input_select').val(),
+                    'conn_id': $card.find('.sql_input_select').val(),
                     'query_sql': $card.find('.sql_input_area').val()
                 };
                 var columns = $.map($card.find('.target_field_column_wrap select'), function(value){
@@ -190,8 +190,15 @@
                 tasks.push(subTask);
             });
             data.tasks = tasks;
-            $.post(postTaskUrl, data, function(){
-                // 提交成功后待做的操作
+            $.ajax({
+                type: "post",
+                url: postTaskUrl,
+                async: false, 
+                data: JSON.stringify(data),
+                contentType: "application/json; charset=utf-8",
+                dataType: "json",
+                success: function(data) {
+                }
             });
         }
         

@@ -20,6 +20,7 @@ services:
         build: ./
         image: lumi/airflow
         restart: always
+        user: root
         depends_on:
             - postgres
             - redis
@@ -30,6 +31,7 @@ services:
             - POSTGRES_USER=airflow
             - POSTGRES_PASSWORD=airflow
             - POSTGRES_DB=airflow
+            - AIRFLOW_WEBSERVER_RBAC=true
               # - REDIS_PASSWORD=redispass
         volumes:
             - ./dags:/usr/local/airflow/dags

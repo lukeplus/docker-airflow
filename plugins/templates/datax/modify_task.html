@@ -39,7 +39,7 @@
                 </select>
             </li>
     </ul>
-    <ul class="subtask_list_wrapper"">
+    <ul class="subtask_list_wrapper">
         
     </ul>
     <div class="save_sub_btn_wrap">
@@ -51,7 +51,7 @@
 
 {% block add_tail_js %}
     <script>
-        var dagUrl = 'http://localhost:8080/datax/api/syncdag/';
+        var dagUrl = '/datax/api/syncdag/';
         var tasks = [];
         var preTaskNames = [];
         var hrefArr = location.href.split('/');
@@ -137,7 +137,7 @@
                 subTask.name = $card.find('.sub_task_name').val();
                 subTask.pre_task = $card.find('.pre_task_select').val();
                 subTask.source = {
-                    'comm_id': $card.find('.sql_input_select').val(),
+                    'conn_id': $card.find('.sql_input_select').val(),
                     'query_sql': $card.find('.sql_input_area').val()
                 };
                 var columns = $.map($card.find('.target_field_column_wrap select'), function(value){
