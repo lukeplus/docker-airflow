@@ -4,8 +4,8 @@
         };
         SubTaskCard.prototype = {
             init: function(options) {
-                this.getConnectionsUrl = 'http://192.168.100.133:8080/datax/api/connections';
-                this.baseUrl = 'http://192.168.100.133:8080/datax/api/connection/';
+                this.getConnectionsUrl = '/datax/api/connections';
+                this.baseUrl = '/datax/api/connection/';
                 this.connectionsVal = '';
                 this.connectionsData = [];
                 this.tablesData = [];
@@ -118,13 +118,13 @@
             template: function() {
                 return '<li class="subtask_list_card">' +
                 '<div class="subtask_list_card_title">' +
-                    '<h4>+    子任务</h4>' +
+                    '<h4>+    任务</h4>' +
                     '<span class="glyphicon glyphicon-remove remove_sub_task"></span>' +
                 '</div>' +
                 '<div>' +
                     '<ul class="subtask_list_card_nav">' +
                         '<li class="li_label">' +
-                            '<label class="label_left">子任务名称</label>' +
+                            '<label class="label_left">任务名称</label>' +
                             '<input type="text" class="head_input form-control sub_task_name">' +
                         '</li>' +
                         '<li class="li_label">' +
@@ -137,7 +137,7 @@
                         '<li class="subtask_list_item">' +
                             '<ul class="nav nav-tabs">' +
                                 '<li role="presentation" class="active">' +
-                                    '<a data-toggle="tab" disable_anchor="true" role="tab" aria-expanded="true">输入SQL</a>' +
+                                    '<a data-toggle="tab" disable_anchor="true" role="tab" aria-expanded="true">源库设置</a>' +
                                 '</li>' +
                             '</ul>' +
                             '<div class="tab-content nav nav-tabs">' +
@@ -150,7 +150,7 @@
                         '<li class="subtask_list_item">' +
                             '<ul class="nav nav-tabs">' +
                                 '<li role="presentation" class="active">' +
-                                    '<a data-toggle="tab" disable_anchor="true" role="tab" aria-expanded="true">目的库</a>' +
+                                    '<a data-toggle="tab" disable_anchor="true" role="tab" aria-expanded="true">目的库设置</a>' +
                                 '</li>' +
                             '</ul>' +
                             '<div class="tab-content nav nav-tabs">' +
@@ -252,7 +252,7 @@
                 var self = this;
                 var $subFieldLi = $(self.subFieldLiTemplate());
                 $wrap.append($subFieldLi);
-                
+
                 $subFieldLi.find('select').selectpicker('initSelectOption', {
                     idKey: 'value',
                     nameKey: 'label',

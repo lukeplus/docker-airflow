@@ -14,10 +14,10 @@
 
 {% block content %}
 <div class="add_task_wrapper">
-    <h3>编辑任务</h3>
+    <h3>编辑数据同步DAG</h3>
     <ul class="add_task_head">
         <li class="li_label">
-            <label class="label_left">任务名称</label>
+            <label class="label_left">DAG名称</label>
             <input type="text" readonly class="head_input form-control task_name" value="{{dag.name}}">
         </li>
         <li class="li_label">
@@ -40,10 +40,10 @@
             </li>
     </ul>
     <ul class="subtask_list_wrapper">
-        
+
     </ul>
     <div class="save_sub_btn_wrap">
-        <button class="btn btn-primary add_new_sub_task">添加子任务</button>
+        <button class="btn btn-primary add_new_sub_task">添加任务</button>
         <button class="btn btn-primary save_sub_task">保存</button>
     </div>
 </div>
@@ -57,7 +57,7 @@
         var hrefArr = location.href.split('/');
         var taskName = hrefArr[hrefArr.length - 1];
         var self = this;
-        
+
         $.ajax({
             url: dagUrl + taskName,
             cache: false,
@@ -119,7 +119,7 @@
                 $(select).selectpicker('val', tasks[index].pre_task);
             });
         }
-        
+
         // 保存事件
         $('.save_sub_task').click(function(){
             postTaskData();
@@ -162,9 +162,9 @@
                 },
                 error: function() {
                     alert('更新失败，请重试！');
-                }  
+                }
             });
         }
-        
+
     </script>
 {% endblock %}

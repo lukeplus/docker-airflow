@@ -250,7 +250,7 @@ class RDBMS2RDBMSAppendHook(BaseHook):
         self.refresh_max_append_column_value()
         self.run_datax_job()
         self.migrate_temp_table_to_tar_table()
-        # self.drop_temp_table()
+        self.drop_temp_table()
 
     def refresh_max_append_column_value(self):
         """
@@ -586,8 +586,8 @@ class DataXDAGView(AppBuilderBaseView):
 
 datax_view = DataXDAGView()
 appbuilder_views = {
-    "name": "任务列表",
-    "category": "同步任务",
+    "name": "DAG列表",
+    "category": "数据同步DAGs",
     "view": datax_view
 }
 
