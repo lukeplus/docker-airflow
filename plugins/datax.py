@@ -112,10 +112,13 @@ class RDMS2RDMSOperator(BaseOperator):
                  sync_type,
                  src_conn_id,
                  src_query_sql,
+                 src_source_from,
                  tar_conn_id,
                  tar_table,
                  tar_columns,
                  append_column,
+                 tar_pkeys,
+                 tar_source_from_column,
                  *args,
                  **kwargs):
         """
@@ -127,10 +130,13 @@ class RDMS2RDMSOperator(BaseOperator):
         self.sync_type = sync_type
         self.src_conn_id = src_conn_id
         self.src_query_sql = src_query_sql
+        self.src_source_from = src_source_from
         self.tar_conn_id = tar_conn_id
         self.tar_table = tar_table
         self.tar_columns = tar_columns
         self.append_column = append_column
+        self.tar_pkeys = tar_pkeys
+        self.tar_source_from_column = tar_source_from_column
 
     def execute(self, context):
         """
@@ -144,19 +150,25 @@ class RDMS2RDMSOperator(BaseOperator):
                             task_id=task_id,
                             src_conn_id=self.src_conn_id,
                             src_query_sql=self.src_query_sql,
+                            src_source_from=self.src_source_from,
                             tar_conn_id=self.tar_conn_id,
                             tar_table=self.tar_table,
                             tar_columns=self.tar_columns,
+                            tar_pkeys=self.tar_pkeys,
+                            tar_source_from_column=self.tar_source_from_column,
                         )
         elif self.sync_type == "增量同步":
             self.hook = RDBMS2RDBMSAppendHook(
                             task_id=task_id,
                             src_conn_id=self.src_conn_id,
                             src_query_sql=self.src_query_sql,
+                            src_source_from=self.src_source_from,
                             tar_conn_id=self.tar_conn_id,
                             tar_table=self.tar_table,
                             tar_columns=self.tar_columns,
-                            append_column=self.append_column
+                            append_column=self.append_column,
+                            tar_pkeys=self.tar_pkeys,
+                            tar_source_from_column=self.tar_source_from_column,
                         )
         self.hook.execute(context=context)
 
@@ -174,16 +186,25 @@ class RDBMS2RDBMSFullHook(BaseHook):
                  task_id,
                  src_conn_id,
                  src_query_sql,
+                 src_source_from,
                  tar_conn_id,
                  tar_table,
-                 tar_columns):
+                 tar_columns,
+                 tar_pkeys,
+                 tar_source_from_column):
         self.task_id = task_id
         self.src_conn = self.get_connection(src_conn_id)
         self.src_query_sql = src_query_sql
+        self.src_source_from = src_source_from
         self.tar_conn = self.get_connection(tar_conn_id)
         self.tar_table = tar_table
         self.tar_columns = tar_columns
-        self.tar_pre_sql = "DELETE FROM %s" % self.tar_table
+        if tar_source_from_column:
+            self.tar_pre_sql = "DELETE FROM %s WHERE %s='%s'" % (self.tar_table,
+                                                                 tar_source_from_column,
+                                                                 src_source_from)
+        self.tar_pkeys = tar_pkeys
+        self.tar_source_from_column = tar_source_from_column
 
     def execute(self, context):
         self.log.info('RDMS2RDMSOperator execute...')
@@ -224,19 +245,25 @@ class RDBMS2RDBMSAppendHook(BaseHook):
                  task_id,
                  src_conn_id,
                  src_query_sql,
+                 src_source_from,
                  tar_conn_id,
                  tar_table,
                  tar_columns,
-                 append_column):
+                 append_column,
+                 tar_pkeys,
+                 tar_source_from_column):
         self.task_id = task_id
         self.src_conn = self.get_connection(src_conn_id)
         self.src_query_sql = src_query_sql
+        self.src_source_from = src_source_from
         self.tar_conn = self.get_connection(tar_conn_id)
         self.tar_table = tar_table
         self.tmp_tar_table = "tmp_append_%s" % tar_table
         self.tar_columns = tar_columns
         self.append_column = append_column
         self.max_append_column_value = None
+        self.tar_pkeys = tar_pkeys
+        self.tar_source_from_column = tar_source_from_column
 
     def execute(self, context):
         """
