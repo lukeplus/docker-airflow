@@ -108,3 +108,15 @@ li.li_label {
     width: 20%!important;
     margin-left: 10px!important;
 }
+.source_li {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+.source_label {
+    width: 10%;
+    margin: 0;
+}
+.sql_top_input, .target_top_input {
+    width: 50%;
+}
