@@ -136,6 +136,8 @@ class RDMS2RDMSOperator(BaseOperator):
         self.tar_columns = tar_columns
         self.append_column = append_column
         self.tar_pkeys = [c.strip() for c in tar_pkeys.split(",") if c.strip()]
+        if not self.tar_pkeys:
+            self.tar_pkeys = ["id"]
         self.tar_source_from_column = tar_source_from_column
 
     def execute(self, context):
