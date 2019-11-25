@@ -34,10 +34,13 @@ dag = DAG(
     task_id="{{t.name}}",
     src_conn_id="{{t.source.conn_id}}",
     src_query_sql="{{t.source.query_sql}}",
+    src_source_from='{{t.source.source_from}}',
     tar_conn_id="{{t.target.conn_id}}",
     tar_table="{{t.target.table}}",
     tar_columns={{t.target.columns}},
     append_column='{{append_column}}',
+    tar_pkeys='{{t.target.pkeys}}',
+    tar_source_from_column='{{t.target.source_from_column}}',
     dag=dag,
 )
 {% endfor %}

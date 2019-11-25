@@ -135,7 +135,7 @@ class RDMS2RDMSOperator(BaseOperator):
         self.tar_table = tar_table
         self.tar_columns = tar_columns
         self.append_column = append_column
-        self.tar_pkeys = tar_pkeys
+        self.tar_pkeys = [c.strip() for c in tar_pkeys.split(",") if c.strip()]
         self.tar_source_from_column = tar_source_from_column
 
     def execute(self, context):
@@ -199,12 +199,17 @@ class RDBMS2RDBMSFullHook(BaseHook):
         self.tar_conn = self.get_connection(tar_conn_id)
         self.tar_table = tar_table
         self.tar_columns = tar_columns
-        if tar_source_from_column:
-            self.tar_pre_sql = "DELETE FROM %s WHERE %s='%s'" % (self.tar_table,
-                                                                 tar_source_from_column,
-                                                                 src_source_from)
         self.tar_pkeys = tar_pkeys
         self.tar_source_from_column = tar_source_from_column
+
+        self.init()
+
+    def init(self):
+        if self.tar_source_from_column:
+            pre_sql = "DELETE FROM %s WHERE %s='%s'"
+            self.tar_pre_sql = pre_sql % (self.tar_table,
+                                          self.tar_source_from_column,
+                                          self.src_source_from)
 
     def execute(self, context):
         self.log.info('RDMS2RDMSOperator execute...')
@@ -269,7 +274,6 @@ class RDBMS2RDBMSAppendHook(BaseHook):
         """
         Execute
         """
-        self.log.info('RDMS2RDMSOperator execute...')
         self.task_id = context['task_instance'].dag_id + "#" + context['task_instance'].task_id
 
         self.drop_temp_table()
@@ -283,7 +287,12 @@ class RDBMS2RDBMSAppendHook(BaseHook):
         """
         刷新增量字段的最大值
         """
-        sql = "SELECT max(%s) FROM %s" % (self.append_column, self.tar_table)
+        sql = "SELECT max(%s) FROM %s WHERE %s='%s'" % (self.append_column,
+                                                        self.tar_table,
+                                                        self.tar_source_from_column,
+                                                        self.src_source_from)
+
+        self.log.info("refresh_max_append_column_value sql: %s", sql)
         with create_external_session(self.tar_conn) as sess:
             result = sess.execute(sql)
         record = result.fetchone()
@@ -316,13 +325,20 @@ class RDBMS2RDBMSAppendHook(BaseHook):
             2. 把新增的行同步过去
         """
         set_caluse = ",".join(["%s=b.%s" % (c, c) for c in self.tar_columns])
+        pkeys_caluse = " AND ".join(["a.%s=b.%s" % (c, c) for c in self.tar_pkeys])
+        pkeys_caluse2 = " AND ".join(["%s=tmp.%s" % (c, c) for c in self.tar_pkeys])
+        columns = ",".join(self.tar_columns)
         data = {
             "table": self.tar_table,
             "temp": self.tmp_tar_table,
             "set_caluse": set_caluse,
+            "pkeys_caluse": pkeys_caluse,
+            "pkeys_caluse2": pkeys_caluse2,
+            "columns": columns,
         }
-        update_sql = "UPDATE {table} a SET {set_caluse} FROM {temp} b WHERE a.id=b.id AND a.id in (SELECT id FROM {temp})"
-        insert_sql = "INSERT INTO {table} (SELECT * FROM {temp} tmp WHERE not exists (SELECT id FROM {table} WHERE id=tmp.id));"
+
+        update_sql = "UPDATE {table} a SET {set_caluse} FROM {temp} b WHERE {pkeys_caluse}"
+        insert_sql = "INSERT INTO {table} ({columns}) (SELECT {columns} FROM {temp} tmp WHERE not exists (SELECT 1 FROM {table} WHERE {pkeys_caluse2}));"
         self.log.info("migrate_temp_table_to_tar_table update_sql: %s", update_sql)
         self.log.info("migrate_temp_table_to_tar_table insert_sql: %s", insert_sql)
         with create_external_session(self.tar_conn) as sess:

@@ -144,11 +144,11 @@
                                 '<div role="tabpanel" class="tab-pane active input_sql_wrapper">' +
                                     '<ul>' +
                                         '<li class="source_li">' +
-                                            '<label class="source_label">选项</label>' +
+                                            '<label class="source_label">源库</label>' +
                                             '<select name="state" class="head_input selectpicker bs-select-hidden sql_input_select"></select>' +
                                         '</li>' +
                                         '<li class="source_li">' +
-                                            '<label class="source_label">输入</label>' +
+                                            '<label class="source_label">来源</label>' +
                                             '<input type="text" class="head_input form-control sql_top_input">' +
                                         '</li>' +
                                     '</ul>' +
@@ -165,8 +165,12 @@
                             '<div class="tab-content nav nav-tabs">' +
                                 '<div role="tabpanel" class="tab-pane active target_field_wrap">' +
                                     '<div class="source_li">' +
-                                        '<label class="source_label">选项</label>' +
-                                        '<input type="text" class="head_input form-control target_top_input">' +
+                                        '<label class="source_label">主键</label>' +
+                                        '<input type="text" class="head_input form-control target_pkey_input">' +
+                                    '</div>' +
+                                    '<div class="source_li">' +
+                                        '<label class="source_label">来源字段</label>' +
+                                        '<input type="text" class="head_input form-control target_source_from_input">' +
                                     '</div>' +
                                     '<ul class="sub_select_zone">' +
                                         '<li class="sub_select_li li_left">' +
@@ -281,6 +285,9 @@
                 var $row = this.$ele;
                 $row.find('.sub_task_name').val(rowValue.name);
                 $row.find('.sql_input_area').val(rowValue.source.query_sql);
+                $row.find('.sql_top_input').val(rowValue.source.source_from);
+                $row.find('.target_pkey_input').val(rowValue.target.pkeys);
+                $row.find('.target_source_from_input').val(rowValue.target.source_from_column);
             },
             setRowPreTaskValue: function() {
                 var $row = this.$ele;

@@ -114,9 +114,9 @@ li.li_label {
     margin-bottom: 10px;
 }
 .source_label {
-    width: 10%;
+    width: 15%;
     margin: 0;
 }
-.sql_top_input, .target_top_input {
+.sql_top_input, .target_pkey_input, .target_source_from_input {
     width: 50%;
 }

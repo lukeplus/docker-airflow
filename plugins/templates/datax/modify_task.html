@@ -138,7 +138,8 @@
                 subTask.pre_task = $card.find('.pre_task_select').val();
                 subTask.source = {
                     'conn_id': $card.find('.sql_input_select').val(),
-                    'query_sql': $card.find('.sql_input_area').val()
+                    'query_sql': $card.find('.sql_input_area').val(),
+                    'source_from': $card.find('.sql_top_input').val()
                 };
                 var columns = $.map($card.find('.target_field_column_wrap select'), function(value){
                     return $(value).val();
@@ -146,7 +147,9 @@
                 subTask.target = {
                     "conn_id": $card.find('.target_field_connection').val(),
                     "table": $card.find('.target_field_table').val(),
-                    "columns": columns
+                    "columns": columns,
+                    "pkeys": $card.find('.target_pkey_input').val(),
+                    "source_from_column": $card.find('.target_source_from_input').val()
                 };
                 tasks.push(subTask);
             });
