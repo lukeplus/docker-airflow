@@ -142,7 +142,16 @@
                             '</ul>' +
                             '<div class="tab-content nav nav-tabs">' +
                                 '<div role="tabpanel" class="tab-pane active input_sql_wrapper">' +
-                                    '<select name="state" class="head_input selectpicker bs-select-hidden sql_input_select"></select>' +
+                                    '<ul>' +
+                                        '<li class="source_li">' +
+                                            '<label class="source_label">选项</label>' +
+                                            '<select name="state" class="head_input selectpicker bs-select-hidden sql_input_select"></select>' +
+                                        '</li>' +
+                                        '<li class="source_li">' +
+                                            '<label class="source_label">输入</label>' +
+                                            '<input type="text" class="head_input form-control sql_top_input">' +
+                                        '</li>' +
+                                    '</ul>' +
                                     '<textarea class="form-control sql_input_area" rows="8" name="textarea"></textarea>' +
                                 '</div>' +
                             '</div>' +
@@ -155,6 +164,10 @@
                             '</ul>' +
                             '<div class="tab-content nav nav-tabs">' +
                                 '<div role="tabpanel" class="tab-pane active target_field_wrap">' +
+                                    '<div class="source_li">' +
+                                        '<label class="source_label">选项</label>' +
+                                        '<input type="text" class="head_input form-control target_top_input">' +
+                                    '</div>' +
                                     '<ul class="sub_select_zone">' +
                                         '<li class="sub_select_li li_left">' +
                                             '<select name="state" class="head_input selectpicker target_field_connection"></select>' +
@@ -218,6 +231,9 @@
                     nameKey: 'label',
                     data: data
                 });
+                this.connectionsVal = this.$ele.find('.target_field_connection').val();
+                var url = this.baseUrl + this.connectionsVal + '/tables';
+                this.getTablesData(url);
             },
             attachPickerTable: function(data){
                 this.$ele.find('.target_field_table').selectpicker('initSelectOption', {
@@ -225,6 +241,8 @@
                     nameKey: 'label',
                     data: data
                 });
+                var url = this.baseUrl + this.connectionsVal + '/table/' + this.$ele.find('.target_field_table').val() + '/columns';
+                this.getColumnsData(url);
             },
             attachPickerColumn: function(data) {
                 $.each(this.$ele.find('.target_field_column_wrap select'), function(index, dom){
