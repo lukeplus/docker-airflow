@@ -76,7 +76,7 @@ class SyncDAGModel(DagModel):
     sync_dag_id = Column(String(ID_LEN),
                          ForeignKey('dag.dag_id'), primary_key=True)
     sync_type = Column(String(50))
-    task_json_str = Column(String(5000), default="[]")
+    task_json_str = Column(String(50000), default="[]")
 
     def to_json(self):
         return {
