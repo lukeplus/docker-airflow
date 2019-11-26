@@ -38,9 +38,7 @@
                         if (result.code === 0) {
                             self.connectionsData = self.formatData(result.connections);
                             self.attachPickerConnection(self.connectionsData);
-                            if (self.task) {
-                                self.setRowConnectionValue(self.task);
-                            }
+                            self.setRowConnectionValue(self.task);
                         } else {
                             alert(result.msg);
                         }
@@ -59,9 +57,7 @@
                         if (result.code === 0) {
                             self.tablesData = self.formatData(result.tables);
                             self.attachPickerTable(self.tablesData);
-                            if (self.task) {
-                                self.setRowTableValue(self.task);
-                            }
+                            self.setRowTableValue(self.task);
                         } else {
                             alert(result.msg);
                         }
@@ -80,9 +76,7 @@
                         if (result.code === 0) {
                             self.columnsData = self.formatColumnsData(result.tables);
                             self.attachPickerColumn(self.columnsData);
-                            if (self.task) {
-                                self.setRowColumnValue(self.task);
-                            }
+                            self.setRowColumnValue(self.task);
                         } else {
                             alert(result.msg);
                         }
@@ -235,11 +229,6 @@
                     nameKey: 'label',
                     data: data
                 });
-                this.connectionsVal = this.$ele.find('.target_field_connection').val();
-                if (this.connectionsVal) {
-                    var url = this.baseUrl + this.connectionsVal + '/tables';
-                    this.getTablesData(url);
-                }
             },
             attachPickerTable: function(data){
                 this.$ele.find('.target_field_table').selectpicker('initSelectOption', {
@@ -247,11 +236,6 @@
                     nameKey: 'label',
                     data: data
                 });
-                var value = this.$ele.find('.target_field_table').val();
-                if (this.connectionsVal && value) {
-                    var url = this.baseUrl + this.connectionsVal + '/table/' + value + '/columns';
-                    this.getColumnsData(url);
-                }
             },
             attachPickerColumn: function(data) {
                 $.each(this.$ele.find('.target_field_column_wrap select'), function(index, dom){
@@ -300,40 +284,55 @@
             },
             setRowConnectionValue: function(rowValue) {
                 var $row = this.$ele;
-                $row.find('.sql_input_select').selectpicker('val', rowValue.source.conn_id);
-                $row.find('.target_field_connection').selectpicker('val', rowValue.target.conn_id);
-                this.connectionsVal = rowValue.target.conn_id;
-                var url = this.baseUrl + this.connectionsVal + '/tables';
-                this.getTablesData(url);
+                if (rowValue) {
+                    $row.find('.sql_input_select').selectpicker('val', rowValue.source.conn_id);
+                    $row.find('.target_field_connection').selectpicker('val', rowValue.target.conn_id);
+                    this.connectionsVal = rowValue.target.conn_id;
+                    var url = this.baseUrl + this.connectionsVal + '/tables';
+                    this.getTablesData(url);
+                } else {
+                    $row.find('.sql_input_select').selectpicker('val', '');
+                    $row.find('.target_field_connection').selectpicker('val', '');
+                }
             },
             setRowTableValue: function(rowValue) {
                 var $row = this.$ele;
-                $row.find('.target_field_table').selectpicker('val', rowValue.target.table);
-                var value = rowValue.target.table;
-                var url = this.baseUrl + this.connectionsVal + '/table/' + value + '/columns';
-                this.getColumnsData(url);
+                if (rowValue) {
+                    $row.find('.target_field_table').selectpicker('val', rowValue.target.table);
+                    var value = rowValue.target.table;
+                    var url = this.baseUrl + this.connectionsVal + '/table/' + value + '/columns';
+                    this.getColumnsData(url);
+                } else {
+                    $row.find('.target_field_table').selectpicker('val', '');
+                }
             },
             setRowColumnValue: function(rowValue) {
                 var $row = this.$ele;
-                var $columns = $row.find('.target_field_column_wrap .selectpicker');
-                var $columnWrap = $row.find('.target_field_column_wrap');
-                var columns = rowValue.target.columns;
-                if (!columns.length) {
-                    $columnWrap.empty();
-                } else if (columns.length > $columns.length) {
-                    for (var i = 0; i < columns.length - $columns.length; i++) {
-                        this.addNewField($columnWrap);
+                if (rowValue) {
+                    var $columns = $row.find('.target_field_column_wrap .selectpicker');
+                    var $columnWrap = $row.find('.target_field_column_wrap');
+                    var columns = rowValue.target.columns;
+                    if (!columns.length) {
+                        $columnWrap.empty();
+                    } else if (columns.length > $columns.length) {
+                        for (var i = 0; i < columns.length - $columns.length; i++) {
+                            this.addNewField($columnWrap);
+                        }
                     }
+                    $.each($row.find('.target_field_column_wrap .field_li'), function(index, dom){
+                        var columnVal = rowValue.target.columns[index];
+                        var $dom = $(dom);
+                        if (columnVal) {
+                            $dom.find('.selectpicker').selectpicker('val', columnVal);
+                        } else {
+                            $dom.remove();
+                        }
+                    });
+                } else {
+                    $.each($row.find('.target_field_column_wrap .field_li'), function(index, dom){
+                        $dom.find('.selectpicker').selectpicker('val', '');
+                    });
                 }
-                $.each($row.find('.target_field_column_wrap .field_li'), function(index, dom){
-                    var columnVal = rowValue.target.columns[index];
-                    var $dom = $(dom);
-                    if (columnVal) {
-                        $dom.find('.selectpicker').selectpicker('val', columnVal);
-                    } else {
-                        $dom.remove();
-                    }
-                });
             },
         };
         $.fn.subTaskCard = function(options) {
