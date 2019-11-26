@@ -236,8 +236,10 @@
                     data: data
                 });
                 this.connectionsVal = this.$ele.find('.target_field_connection').val();
-                var url = this.baseUrl + this.connectionsVal + '/tables';
-                this.getTablesData(url);
+                if (this.connectionsVal) {
+                    var url = this.baseUrl + this.connectionsVal + '/tables';
+                    this.getTablesData(url);
+                }
             },
             attachPickerTable: function(data){
                 this.$ele.find('.target_field_table').selectpicker('initSelectOption', {
@@ -245,8 +247,11 @@
                     nameKey: 'label',
                     data: data
                 });
-                var url = this.baseUrl + this.connectionsVal + '/table/' + this.$ele.find('.target_field_table').val() + '/columns';
-                this.getColumnsData(url);
+                var value = this.$ele.find('.target_field_table').val();
+                if (this.connectionsVal && value) {
+                    var url = this.baseUrl + this.connectionsVal + '/table/' + value + '/columns';
+                    this.getColumnsData(url);
+                }
             },
             attachPickerColumn: function(data) {
                 $.each(this.$ele.find('.target_field_column_wrap select'), function(index, dom){
