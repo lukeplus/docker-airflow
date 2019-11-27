@@ -289,10 +289,13 @@ class RDBMS2RDBMSAppendHook(BaseHook):
         """
         刷新增量字段的最大值
         """
-        sql = "SELECT max(%s) FROM %s WHERE %s='%s'" % (self.append_column,
-                                                        self.tar_table,
-                                                        self.tar_source_from_column,
-                                                        self.src_source_from)
+        where = ""
+        if self.tar_source_from_column:
+            where = "%s='%s'" % (self.tar_source_from_column, self.src_source_from)
+
+        sql = "SELECT max(%s) FROM %s " % (self.append_column, self.tar_table)
+        if where:
+            sql = sql + " WHERE " + where
 
         self.log.info("refresh_max_append_column_value sql: %s", sql)
         with create_external_session(self.tar_conn) as sess:
