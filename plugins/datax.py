@@ -207,11 +207,14 @@ class RDBMS2RDBMSFullHook(BaseHook):
         self.init()
 
     def init(self):
+        where = ""
         if self.tar_source_from_column:
-            pre_sql = "DELETE FROM %s WHERE %s='%s'"
-            self.tar_pre_sql = pre_sql % (self.tar_table,
-                                          self.tar_source_from_column,
-                                          self.src_source_from)
+            where = "%s='%s'" % (self.tar_source_from_column, self.src_source_from)
+
+        sql = "DELETE FROM %s"
+        if where:
+            sql = sql + " WHERE " + where
+        self.tar_pre_sql = sql
 
     def execute(self, context):
         self.log.info('RDMS2RDMSOperator execute...')
