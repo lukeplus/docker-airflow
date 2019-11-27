@@ -42,11 +42,11 @@ def generate_dag_file(data):
     template = Template(tpl_content)
     today = dte.utcnow()
 
-    partent2child = []
+    parent2child = []
     for t in data["tasks"]:
         if not t["pre_task"]:
             continue
-        partent2child.append((t["pre_task"], t["name"]))
+        parent2child.append((t["pre_task"], t["name"]))
 
     content = template.render(
         sync_type=data["sync_type"],
@@ -58,7 +58,7 @@ def generate_dag_file(data):
         retries=1,
         interval=trans_interval(data["interval"]),
         tasks=data["tasks"],
-        partent2child=partent2child,
+        parent2child=parent2child,
     )
 
     target_path = os.path.join(TARGET_DIR, "dags/auto_%s.py" % data["name"])
