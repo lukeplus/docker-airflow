@@ -211,7 +211,7 @@ class RDBMS2RDBMSFullHook(BaseHook):
         if self.tar_source_from_column:
             where = "%s='%s'" % (self.tar_source_from_column, self.src_source_from)
 
-        sql = "DELETE FROM %s"
+        sql = "DELETE FROM %s" % self.tar_table
         if where:
             sql = sql + " WHERE " + where
         self.tar_pre_sql = sql
@@ -335,7 +335,7 @@ class RDBMS2RDBMSAppendHook(BaseHook):
         set_caluse = ",".join(["%s=b.%s" % (c, c) for c in self.tar_columns])
         pkeys_caluse = " AND ".join(["a.%s=b.%s" % (c, c) for c in self.tar_pkeys])
         pkeys_caluse2 = " AND ".join(["%s=tmp.%s" % (c, c) for c in self.tar_pkeys])
-        columns = ",".join(self.tar_columns)
+        columns = ",".join(['"%s"' % c for c in self.tar_columns])
         data = {
             "table": self.tar_table,
             "temp": self.tmp_tar_table,
@@ -345,8 +345,8 @@ class RDBMS2RDBMSAppendHook(BaseHook):
             "columns": columns,
         }
 
-        update_sql = "UPDATE {table} a SET {set_caluse} FROM {temp} b WHERE {pkeys_caluse}"
-        insert_sql = "INSERT INTO {table} ({columns}) (SELECT {columns} FROM {temp} tmp WHERE not exists (SELECT 1 FROM {table} WHERE {pkeys_caluse2}));"
+        update_sql = """UPDATE {table} a SET {set_caluse} FROM {temp} b WHERE {pkeys_caluse}"""
+        insert_sql = """INSERT INTO {table} ({columns}) (SELECT {columns} FROM {temp} tmp WHERE not exists (SELECT 1 FROM {table} WHERE {pkeys_caluse2}));"""
         self.log.info("migrate_temp_table_to_tar_table update_sql: %s", update_sql)
         self.log.info("migrate_temp_table_to_tar_table insert_sql: %s", insert_sql)
         with create_external_session(self.tar_conn) as sess:
