@@ -28,6 +28,8 @@ class DataXConnectionInfo(object):
                 self._conn_type = "mysql"
             elif db_type in ["postgres", "postgresql", "pg"]:
                 self._conn_type = "postgresql"
+            elif db_type in ["mssql"]:
+                self._conn_type = "sqlserver"
             else:
                 self._conn_type = db_type
         return self._conn_type
@@ -36,7 +38,8 @@ class DataXConnectionInfo(object):
     def reader_name(self):
         name2reader = {
             "mysql": "mysqlreader",
-            "postgresql": "postgresqlreader"
+            "postgresql": "postgresqlreader",
+            "sqlserver": "sqlserverreader"
         }
         return name2reader[self.conn_type]
 
@@ -44,7 +47,8 @@ class DataXConnectionInfo(object):
     def writer_name(self):
         name2writer = {
             "mysql": "mysqlwriter",
-            "postgresql": "postgresqlwriter"
+            "postgresql": "postgresqlwriter",
+            "sqlserver": "sqlserverwriter"
         }
         return name2writer[self.conn_type]
 
