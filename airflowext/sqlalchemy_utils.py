@@ -34,6 +34,8 @@ def trans_conn(conn):
     conn_type = conn.conn_type
     if conn.conn_type == "postgres":
         conn_type = "postgresql"
+    elif conn.conn_type == "mssql":
+        conn_type = "mssql+pymssql"
     host = conn.host.strip()
     port = str(conn.port)
     username = conn.login.strip()
@@ -71,8 +73,13 @@ def get_external_tables(session):
 
     目前只支持PG库
     """
-    assert session.conn_type == "postgresql"
-    result = session.execute("select tablename from pg_tables where schemaname='public'")
+    sql_dct = {
+        "postgresql": "select tablename from pg_tables where schemaname='public'",
+        "mssql+pymssql": "SELECT Name FROM SysObjects WHERE XType='U' ORDER BY Name",
+    }
+    assert session.conn_type in sql_dct
+
+    result = session.execute(sql_dct[session.conn_type])
     tables = []
     for row in result.fetchall():
         tables.append(row[0])
@@ -80,7 +87,12 @@ def get_external_tables(session):
 
 
 def get_external_columns(session, table):
-    assert session.conn_type == "postgresql"
+    sql_dct = {
+        "postgresql": "select column_name,data_type from information_schema.columns where table_name='%s';" % table,
+        "mssql+pymssql": "Select Name FROM SysColumns Where id=Object_Id('%s');" % table,
+    }
+    assert session.conn_type in sql_dct
+
     sql = "select column_name,data_type from information_schema.columns where table_name='%s';" % table
     result = session.execute(sql)
     tables = []
