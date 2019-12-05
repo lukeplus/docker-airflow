@@ -269,6 +269,8 @@ class RDBMS2RDBMSAppendHook(BaseHook):
         self.tar_conn = self.get_connection(tar_conn_id)
         self.tar_table = tar_table
         self.tmp_tar_table = "tmp_append_%s" % tar_table
+        if src_source_from:
+            self.tmp_tar_table = self.tmp_tar_table + "_" + src_source_from
         self.tar_columns = tar_columns
         self.append_column = append_column
         self.max_append_column_value = None
