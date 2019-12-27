@@ -61,8 +61,9 @@ RUN set -ex \
     && pip install pyOpenSSL -i https://pypi.douban.com/simple/ \
     && pip install ndg-httpsclient -i https://pypi.douban.com/simple/ \
     && pip install pyasn1 -i https://pypi.douban.com/simple/ \
-    && pip install apache-airflow[crypto,celery,postgres,hive,jdbc,mysql,mssql,ssh${AIRFLOW_DEPS:+,}${AIRFLOW_DEPS}]==${AIRFLOW_VERSION} -i https://pypi.douban.com/simple/ \
+    && pip install apache-airflow[crypto,celery,postgres,hive,jdbc,mysql,ssh${AIRFLOW_DEPS:+,}${AIRFLOW_DEPS}]==${AIRFLOW_VERSION} -i https://pypi.douban.com/simple/ \
     && pip install 'redis==3.2' -i https://pypi.douban.com/simple/ \
+    && pip install 'pymssql<3.0' -i https://pypi.douban.com/simple/ \
     && if [ -n "${PYTHON_DEPS}" ]; then pip install ${PYTHON_DEPS} -i https://pypi.douban.com/simple/ ; fi \
     && apt-get purge --auto-remove -yqq $buildDeps \
     && apt-get autoremove -yqq --purge \

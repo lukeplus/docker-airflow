@@ -48,6 +48,16 @@ def generate_dag_file(data):
             continue
         parent2child.append((t["pre_task"], t["name"]))
 
+    tasks = data["tasks"]
+    for t in tasks:
+        table = t["target"]["table"]
+        if table in ["mes_test_record"]:
+            t["append_column"] = "create_date"
+        elif table in ["mes_ate_test_record", "mes_ate_test_record_line"]:
+            t["append_column"] = "start_time"
+        else:
+            t["append_column"] = "write_date"
+
     content = template.render(
         sync_type=data["sync_type"],
         append_column=data["append_column"],
@@ -57,7 +67,7 @@ def generate_dag_file(data):
         email="junping.luo@aqara.com",
         retries=1,
         interval=trans_interval(data["interval"]),
-        tasks=data["tasks"],
+        tasks=tasks,
         parent2child=parent2child,
     )
 

@@ -7,6 +7,7 @@ import subprocess
 import os
 import json
 import re
+import time
 
 from datetime import timedelta
 from airflow.plugins_manager import AirflowPlugin
@@ -79,13 +80,14 @@ class SyncDAGModel(DagModel):
     task_json_str = Column(String(50000), default="[]")
 
     def to_json(self):
+        append_column = "write_date"
         return {
             "name": self.dag_id,
             "sync_type": self.sync_type,
             "interval": dump_interval(self.schedule_interval),
             "state": self.state,
             "tasks": json.loads(self.task_json_str),
-            "append_column": "write_date",
+            "append_column": append_column,
         }
 
     @property
@@ -314,16 +316,30 @@ class RDBMS2RDBMSAppendHook(BaseHook):
         """
         创建用于增量同步的临时表
         """
-        create_sql = "CREATE TABLE %s AS (SELECT * FROM %s WHERE 1=2)" % (self.tmp_tar_table, self.tar_table)
+        create_sql = "CREATE TABLE {new_table} AS (SELECT * FROM {old_table} WHERE 1=2)"
+        if self.tar_conn.conn_type.strip()  in ["mssql", "sqlserver"]:
+            create_sql = "Select * into {new_table} from {old_table} WHERE 1=2"
+
+        data = {
+            "new_table": self.tmp_tar_table,
+            "old_table": self.tar_table
+        }
+        create_sql = create_sql.format(**data)
         with create_external_session(self.tar_conn) as sess:
-            sess.execute("DROP TABLE IF EXISTS %s;" % self.tmp_tar_table)
             sess.execute(create_sql)
 
     def drop_temp_table(self):
         """
         删掉临时表
         """
-        drop_sql = "DROP TABLE IF EXISTS %s;" % self.tmp_tar_table
+        drop_sql = "DROP TABLE IF EXISTS {table}"
+        if self.tar_conn.conn_type.strip()  in ["mssql", "sqlserver"]:
+            drop_sql = """
+            IF EXISTS
+                (SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = '{table}')
+                DROP TABLE {table}
+            """
+        drop_sql = drop_sql.format(table=self.tmp_tar_table)
         with create_external_session(self.tar_conn) as sess:
             sess.execute(drop_sql)
 
@@ -348,12 +364,17 @@ class RDBMS2RDBMSAppendHook(BaseHook):
         }
 
         update_sql = """UPDATE {table} a SET {set_caluse} FROM {temp} b WHERE {pkeys_caluse}"""
+        update_sql = update_sql.format(**data)
         insert_sql = """INSERT INTO {table} ({columns}) (SELECT {columns} FROM {temp} tmp WHERE not exists (SELECT 1 FROM {table} WHERE {pkeys_caluse2}));"""
-        self.log.info("migrate_temp_table_to_tar_table update_sql: %s", update_sql)
-        self.log.info("migrate_temp_table_to_tar_table insert_sql: %s", insert_sql)
+        insert_sql = insert_sql.format(**data)
         with create_external_session(self.tar_conn) as sess:
-            sess.execute(update_sql.format(**data))
-            sess.execute(insert_sql.format(**data))
+            self.log.info("migrate_temp_table_to_tar_table start")
+            self.log.info("migrate_temp_table_to_tar_table update_sql: %s", update_sql)
+            t1 = time.time()
+            sess.execute(update_sql)
+            self.log.info("migrate_temp_table_to_tar_table insert_sql: %s", insert_sql)
+            sess.execute(insert_sql)
+            self.log.info("migrate_temp_table_to_tar_table end")
 
     def trans_conn_to_datax_conn(self, conn):
         return DataXConnectionInfo(

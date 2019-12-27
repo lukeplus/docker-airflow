@@ -54,8 +54,12 @@ class DataXConnectionInfo(object):
 
     @property
     def jdbc_url(self):
+        if self.conn_type in ["sqlserver"]:
+            url_tpl = "jdbc:{conn_type}://{host}:{port};DatabaseName={schema}"
+        else:
+            url_tpl = "jdbc:{conn_type}://{host}:{port}/{schema}"
         if not hasattr(self, "_jdbc_url"):
-            self._jdbc_url = "jdbc:{conn_type}://{host}:{port}/{schema}".format(**dict(
+            self._jdbc_url = url_tpl.format(**dict(
                 conn_type=self.conn_type,
                 host=self.host,
                 port=self.port,
