@@ -8,8 +8,9 @@ import os
 import json
 import re
 import time
+import pytz
 
-from datetime import timedelta
+from datetime import timedelta, datetime
 from airflow.plugins_manager import AirflowPlugin
 from flask import Blueprint, request
 from flask.views import MethodView
@@ -37,6 +38,10 @@ from airflowext.datax_util import DataXConnectionInfo, RDMS2RDMSDataXJob
 
 
 SYNC_TYPES = ["增量同步", "全量同步"]
+
+
+def now_date(fmt):
+    return datetime.now(pytz.timezone('Asia/Shanghai')).strftime(fmt)
 
 
 def load_interval(text):
@@ -208,15 +213,22 @@ class RDBMS2RDBMSFullHook(BaseHook):
 
         self.init()
 
+    def cal_source_from_value(self):
+        lst = self.src_source_from.split(":")
+        if len(lst) > 1 and lst[0].lower() == "function":
+            return eval(lst[1])
+        return self.src_source_from
+
     def init(self):
         where = ""
         if self.tar_source_from_column:
-            where = "%s='%s'" % (self.tar_source_from_column, self.src_source_from)
+            where = "%s='%s'" % (self.tar_source_from_column, self.cal_source_from_value())
 
         sql = "DELETE FROM %s" % self.tar_table
         if where:
             sql = sql + " WHERE " + where
         self.tar_pre_sql = sql
+        self.log.info('pre_sql: %s', sql)
 
     def execute(self, context):
         self.log.info('RDMS2RDMSOperator execute...')
@@ -272,7 +284,7 @@ class RDBMS2RDBMSAppendHook(BaseHook):
         self.tar_table = tar_table
         self.tmp_tar_table = "tmp_append_%s" % tar_table
         if src_source_from:
-            self.tmp_tar_table = self.tmp_tar_table + "_" + src_source_from
+            self.tmp_tar_table = self.tmp_tar_table + "_" + src_source_from.split(":")[0]
         self.tar_columns = tar_columns
         self.append_column = append_column
         self.max_append_column_value = None
