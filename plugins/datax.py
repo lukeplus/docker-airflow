@@ -510,6 +510,15 @@ class SyncDAGListView(MethodView):
             "msg": "新建成功"
         })
 
+    @provide_session
+    def get(self, session=None):
+        """
+        获取DAG
+        """
+        dags = session.query(SyncDAGModel).all()
+        lst = [dag.to_json() for dag in dags]
+        return jsonify(lst)
+
 
 class SyncDAGDetailView(MethodView):
 
