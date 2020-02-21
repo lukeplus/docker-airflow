@@ -10,16 +10,19 @@ import re
 import time
 import pytz
 
+from tempfile import NamedTemporaryFile
 from datetime import timedelta, datetime
+from collections import OrderedDict
 from airflow.plugins_manager import AirflowPlugin
 from flask import Blueprint, request
 from flask.views import MethodView
 from flask_admin import expose
 from flask_admin.base import MenuLink
 from flask.json import jsonify
+from flask import send_file
 
 # Importing base classes that we need to derive
-from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy import Column, Integer, String, ForeignKey, func
 from airflow.models.base import ID_LEN, Base
 from airflow.hooks.base_hook import BaseHook
 from airflow.models import BaseOperator
@@ -108,6 +111,37 @@ class SyncDAGModel(DagModel):
     def delete_dag_file(self):
         if os.path.exists(self.fileloc):
             os.unlink(self.fileloc)
+
+    def dumps(self):
+        tasks = []
+        for t in json.loads(self.task_json_str):
+            tasks.append(OrderedDict({
+                "name": t["name"],
+                "parent": t["pre_task"],
+                "source": {
+                    "conn_id": t["source"]["conn_id"],
+                    "query_sql": t["source"]["query_sql"],
+                    "source_from": t["source"].get("source_from", "")
+                },
+                "target": {
+                    "conn_id": t["target"]["conn_id"],
+                    "table": t["target"]["table"],
+                    "columns": t["target"]["columns"],
+                    "source_from_column": t["source"].get("source_from_column", ""),
+                    "primary_key": t["target"].get("pkeys", "")
+                },
+            }))
+
+        data = OrderedDict({
+            "name": self.dag_id,
+            "sync_type": self.sync_type,
+            "interval": dump_interval(self.schedule_interval),
+            "tasks": tasks
+        })
+        return json.dumps(data, ensure_ascii=False, indent=2)
+
+    def load(self, data):
+        pass
 
 
 class RDMS2RDMSOperator(BaseOperator):
@@ -506,7 +540,7 @@ class SyncDAGListView(MethodView):
 
         dag.refresh_dag_file()
         return jsonify({
-            "status": 0,
+            "code": 0,
             "msg": "新建成功"
         })
 
@@ -530,7 +564,7 @@ class SyncDAGDetailView(MethodView):
         dag = session.query(SyncDAGModel).get(dag_id)
         if not dag:
             return jsonify({
-                "status": -1,
+                "code": -1,
                 "msg": "不存在名为%s的dag" % dag_id
             })
         session.delete(dag)
@@ -538,7 +572,7 @@ class SyncDAGDetailView(MethodView):
         dag.delete_dag_file()
 
         return jsonify({
-            "status": 0,
+            "code": 0,
             "msg": "删除成功"
         })
 
@@ -550,7 +584,7 @@ class SyncDAGDetailView(MethodView):
         dag = session.query(SyncDAGModel).get(dag_id)
         if not dag:
             return jsonify({
-                "status": -1,
+                "code": -1,
                 "msg": "不存在名为%s的dag" % dag_id
             })
         params = json.loads(request.data)
@@ -561,7 +595,7 @@ class SyncDAGDetailView(MethodView):
         dag.refresh_dag_file()
 
         return jsonify({
-            "status": 0,
+            "code": 0,
             "msg": "修改成功"
         })
 
@@ -573,7 +607,7 @@ class SyncDAGDetailView(MethodView):
         dag = session.query(SyncDAGModel).get(dag_id)
         if not dag:
             return jsonify({
-                "status": -1,
+                "code": -1,
                 "msg": "不存在名为%s的dag" % dag_id
             })
         return jsonify(dag.to_json())
@@ -628,6 +662,95 @@ def get_columns(conn_id, table_name, session=None):
         "code": 0,
         "msg": "SUCCESS",
         "tables": columns
+    })
+
+@bp.route("/datax/api/dag/import", methods=["POST"])
+@provide_session
+@csrf.exempt
+def import_dag_from_file(session=None):
+    "从文件导入dag"
+    file = request.files['file']
+    try:
+        data = json.loads(file.read())
+    except:
+        return jsonify({
+            "code": -1,
+            "msg": "invalid json format",
+        })
+    return data
+
+@bp.route("/datax/api/dag/<dag_id>/export", methods=["GET"])
+@provide_session
+@csrf.exempt
+def export_dag(dag_id, session=None):
+    "导出dag"
+    dag = session.query(SyncDAGModel).get(dag_id)
+    if not dag:
+        return jsonify({
+            "code": -1,
+            "msg": "不存在名为%s的dag" % dag_id
+        })
+
+    content = dag.dumps()
+
+    fobj = NamedTemporaryFile(mode='w+b',suffix='json')
+    fobj.write(content.encode("utf-8"))
+    fobj.seek(0,0)
+    return send_file(fobj,
+                     attachment_filename='%s.json' % dag.dag_id,
+                     as_attachment=True,)
+
+@bp.route("/datax/api/dag/<dag_id>/trigger", methods=["POST"])
+@provide_session
+def trigger_dag(self, session=None):
+    dag_id = request.values.get('dag_id')
+    dag = session.query(models.DagModel).filter(models.DagModel.dag_id == dag_id).first()
+    if not dag:
+        return jsonify({
+            "code": -1,
+            "msg": "不存在名为%s的dag" % dag_id
+        })
+
+    execution_date = timezone.utcnow()
+    run_id = "manual__{0}".format(execution_date.isoformat())
+
+    dr = DagRun.find(dag_id=dag_id, run_id=run_id)
+    if dr:
+        return jsonify({
+            "code": -1,
+            "msg": "This run_id {} already exists".format(run_id)
+        })
+    run_conf = {}
+
+    dag.create_dagrun(
+        run_id=run_id,
+        execution_date=execution_date,
+        state=State.RUNNING,
+        conf=run_conf,
+        external_trigger=True
+    )
+
+    return jsonify({
+        "code": 0,
+        "msg": "SUCCESS",
+        "run_id": run_id,
+    })
+
+@bp.route("/datax/api/dag/<dag_id>/runinfo", methods=["GET"])
+@provide_session
+def get_dag_run_info(dag_id, session=None):
+    """
+    执行情况
+    """
+    latest_success = session.query(DagRun).filter(
+        DagRun.dag_id == dag_id,
+        DagRun._state == "success"
+    ).order_by(DagRun.execution_date.desc()).first()
+    return jsonify({
+        "code": 0,
+        "msg": "SUCCESS",
+        "latest_success_execution_date": latest_success.execution_date.strftime("%Y-%m-%d %H:%M:%S"),
+        "latest_sucdess_run_id": latest_success.run_id,
     })
 
 bp.add_url_rule('/datax/api/syncdags', view_func=SyncDAGListView.as_view('syncdaglist'))
