@@ -14,7 +14,7 @@ from tempfile import NamedTemporaryFile
 from datetime import timedelta, datetime
 from collections import OrderedDict
 from airflow.plugins_manager import AirflowPlugin
-from flask import Blueprint, request
+from flask import Blueprint, request, redirect
 from flask.views import MethodView
 from flask_admin import expose
 from flask_admin.base import MenuLink
@@ -140,8 +140,34 @@ class SyncDAGModel(DagModel):
         })
         return json.dumps(data, ensure_ascii=False, indent=2)
 
-    def load(self, data):
-        pass
+    @classmethod
+    def load(cls, raw):
+        tasks = []
+        for t in raw["tasks"]:
+            tasks.append(OrderedDict({
+                "name": t["name"],
+                "pre_task": t["parent"],
+                "source": {
+                    "conn_id": t["source"]["conn_id"],
+                    "query_sql": t["source"]["query_sql"],
+                    "source_from": t["source"].get("source_from", "")
+                },
+                "target": {
+                    "conn_id": t["target"]["conn_id"],
+                    "table": t["target"]["table"],
+                    "columns": t["target"]["columns"],
+                    "source_from_column": t["source"].get("source_from_column", ""),
+                    "pkeys": t["target"].get("primary_key", "")
+                },
+            }))
+
+        data = OrderedDict({
+            "name": raw["name"],
+            "sync_type": raw["sync_type"],
+            "interval": raw["interval"],
+            "tasks": tasks
+        })
+        return data
 
 
 class RDMS2RDMSOperator(BaseOperator):
@@ -672,12 +698,46 @@ def import_dag_from_file(session=None):
     file = request.files['file']
     try:
         data = json.loads(file.read())
-    except:
+    except Exception:
         return jsonify({
             "code": -1,
             "msg": "invalid json format",
         })
-    return data
+    data = SyncDAGModel.load(data)
+
+    name = data["name"]
+    dag = session.query(DagModel).filter_by(dag_id=name).first()
+    if dag:
+        return jsonify({
+            "code": -1,
+            "msg": "名字为%s的DAG已存在!" % name
+        })
+
+    try:
+        interval = load_interval(data["interval"])
+    except Exception as e:
+        raise e
+        return jsonify({
+            "code": -1,
+            "msg": "interval数据格式错误! %s" % params["interval"]
+        })
+
+    dag = SyncDAGModel(
+        dag_id=name,
+        sync_type=data["sync_type"],
+        owners="luke",
+        schedule_interval=interval,
+        fileloc="",
+        task_json_str=json.dumps(data["tasks"]),
+        is_active=True,
+        is_paused=False,
+    )
+    session.add(dag)
+    session.commit()
+
+    dag.refresh_dag_file()
+    return redirect("/dataxdagview/modify/%s" % name)
+
 
 @bp.route("/datax/api/dag/<dag_id>/export", methods=["GET"])
 @provide_session
