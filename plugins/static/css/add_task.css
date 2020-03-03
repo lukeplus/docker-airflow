@@ -1,6 +1,10 @@
 .add_task_wrapper {
     margin: 50px 100px;
 }
+.add_task_title {
+    display: flex;
+    justify-content: space-between;
+}
 ul, li {
     list-style: none;
     padding: 0;
@@ -119,4 +123,7 @@ li.li_label {
 }
 .sql_top_input, .target_pkey_input, .target_source_from_input {
     width: 50%;
+}
+.import_file {
+    display: inline-block!important;
 }

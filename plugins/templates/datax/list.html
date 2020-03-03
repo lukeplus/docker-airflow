@@ -13,6 +13,7 @@
                 <button type="button" class="search_btn btn btn-default">搜索</button>
             </div>
             <a class="add_task_btn btn btn-primary" role="button" href="create">添加任务</a>
+            <button class="btn btn-primary import_data" data-toggle="modal" data-target="#importDataModal">导入</button>
         </div>
         <div class="task_list_container">
             <table id="task-list-table" class="table table-striped table-bordered table-hover dataTable no-footer" role="grid">
@@ -91,6 +92,26 @@
                 </ul>
             </div>
         </div>
+        <div class="modal fade" id="importDataModal" tabindex="-1" role="dialog" aria-labelledby="importDataModalModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                        <h4 class="modal-title" id="importDataModalLabel">导入文件</h4>
+                    </div>
+                    <div class="modal-body">
+                        <div class="import_data_wrap">
+                            <label class="label_left">请选择导入文件</label>
+                            <input type="file" class="import_file">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary confirm_import_data" data-dismiss="modal">确认</button>
+                        <button type="button" class="btn btn-primary cancel_import_data" data-dismiss="modal">取消</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 {% endblock %}
 
@@ -98,6 +119,8 @@
 {{ super() }}
 <script>
     var deleteUrl = "/datax/api/syncdag/";
+    var importUrl = '/datax/api/dag/import';
+
     $( document ).ready(function() {
         $('.delete_task').click(function(ev){
             var id = ev.target.dataset.id;
@@ -115,5 +138,38 @@
             }
         });
     });
+
+     // 导入数据
+     $('.confirm_import_data').click(function(){
+         debugger
+        var import_files = $('.import_file')[0].files;
+        if(import_files.length == 0){
+            alert('请选择文件');
+            return;
+        } else {
+            var formData = new FormData();
+		    formData.append("file",import_files[0]);
+            formData.append("name",$('.import_file').val());
+            $.ajax({
+                type: "post",
+                url: importUrl,
+                data: formData,
+                processData : false,
+                contentType : false,
+                success: function(msg) {
+                    if (msg.code === -1) {
+                        alert(msg.msg);
+                    } else {
+                        window.location.href = msg.redirect;
+                    }
+                },
+                error: function() {
+                    alert('导入失败，请重试！');
+                }
+            });
+        }
+        $('.import_file').val('');
+    });
+    
 </script>
 {% endblock %}

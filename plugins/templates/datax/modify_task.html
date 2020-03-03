@@ -14,7 +14,12 @@
 
 {% block content %}
 <div class="add_task_wrapper">
-    <h3>编辑数据同步DAG</h3>
+    <div class="add_task_title">
+        <h3>编辑数据同步DAG</h3>
+        <div class="title_buttons">
+            <button class="btn btn-primary export_data">导出</button>
+        </div>
+    </div>
     <ul class="add_task_head">
         <li class="li_label">
             <label class="label_left">DAG名称</label>
@@ -52,6 +57,7 @@
 {% block add_tail_js %}
     <script>
         var dagUrl = '/datax/api/syncdag/';
+        var exportUrl = '/datax/api/dag/';
         var tasks = [];
         var preTaskNames = [];
         var hrefArr = location.href.split('/');
@@ -168,6 +174,18 @@
                 }
             });
         }
+
+        // 导出数据
+        $('.export_data').click(function(){
+            let downLink = document.createElement('a');
+            downLink.download = taskName;
+            downLink.href = exportUrl + taskName + '/export';
+            // 链接插入到页面
+            document.body.appendChild(downLink);
+            downLink.click();
+            // 移除下载链接
+            document.body.removeChild(downLink);
+        });
 
     </script>
 {% endblock %}

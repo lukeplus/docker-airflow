@@ -50,3 +50,6 @@ a {
     cursor: not-allowed;
     pointer-events: none
 }
+.import_file {
+    display: inline-block!important;
+}
