@@ -736,7 +736,11 @@ def import_dag_from_file(session=None):
     session.commit()
 
     dag.refresh_dag_file()
-    return redirect("/dataxdagview/modify/%s" % name)
+    return jsonify({
+        "code": 0,
+        "redirect": "/dataxdagview/modify/%s" % name,
+        "msg": "SUCCESS"
+    })
 
 
 @bp.route("/datax/api/dag/<dag_id>/export", methods=["GET"])
