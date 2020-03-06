@@ -13,7 +13,7 @@
                 <button type="button" class="search_btn btn btn-default">搜索</button>
             </div>
             <a class="add_task_btn btn btn-primary" role="button" href="create">添加任务</a>
-            <button class="btn btn-primary import_data" data-toggle="modal" data-target="#importDataModal">导入</button>
+            <button class="btn btn-primary import_data" data-toggle="modal" data-target="#importDataModal">从文件导入</button>
         </div>
         <div class="task_list_container">
             <table id="task-list-table" class="table table-striped table-bordered table-hover dataTable no-footer" role="grid">
@@ -31,7 +31,7 @@
                     {% for dag in dags %}
                     <tr role="row" class="odd">
                         <td>{{loop.index}}</td>
-                        <td>{{dag.name}}</td>
+                        <td class='dag_name_td'>{{dag.name}}</td>
                         <td>{{dag.sync_type}}</td>
                         <td>{{dag.interval}}</td>
                         <td>{{dag.state}}</td>
@@ -170,6 +170,6 @@
         }
         $('.import_file').val('');
     });
-    
+
 </script>
 {% endblock %}

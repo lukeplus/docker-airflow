@@ -24,6 +24,10 @@ th, td {
     text-align: center;
     border-bottom-color: #ddd!important;
 }
+
+.dag_name_td {
+    text-align: center;
+}
 .dataTable {
     border-collapse: collapse!important;
 }
