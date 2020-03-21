@@ -22,6 +22,7 @@ from flask.json import jsonify
 from flask import send_file
 
 # Importing base classes that we need to derive
+from airflow.utils.state import State
 from sqlalchemy import Column, Integer, String, ForeignKey, func
 from airflow.models.base import ID_LEN, Base
 from airflow.hooks.base_hook import BaseHook
@@ -30,6 +31,7 @@ from airflow.models.baseoperator import BaseOperatorLink
 from airflow.sensors.base_sensor_operator import BaseSensorOperator
 from airflow.executors.base_executor import BaseExecutor
 from airflow.utils.decorators import apply_defaults
+from airflow.utils import timezone
 from flask_appbuilder import BaseView as AppBuilderBaseView
 from airflow.exceptions import AirflowException
 from airflow.models import BaseOperator, Connection, DagModel, DagRun
@@ -766,9 +768,9 @@ def export_dag(dag_id, session=None):
 
 @bp.route("/datax/api/dag/<dag_id>/trigger", methods=["POST"])
 @provide_session
-def trigger_dag(self, session=None):
-    dag_id = request.values.get('dag_id')
-    dag = session.query(models.DagModel).filter(models.DagModel.dag_id == dag_id).first()
+def trigger_dag(dag_id, session=None):
+    #dag_id = request.values.get('dag_id')
+    dag = session.query(DagModel).filter(DagModel.dag_id == dag_id).first()
     if not dag:
         return jsonify({
             "code": -1,

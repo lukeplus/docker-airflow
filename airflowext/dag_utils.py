@@ -53,8 +53,8 @@ def generate_dag_file(data):
         table = t["target"]["table"]
         if table in ["mes_test_record"]:
             t["append_column"] = "create_date"
-        elif table in ["mes_ate_test_record", "mes_ate_test_record_line"]:
-            t["append_column"] = "start_time"
+        # elif table in ["mes_ate_test_record", "mes_ate_test_record_line"]:
+        #     t["append_column"] = "start_time"
         else:
             t["append_column"] = "write_date"
 
