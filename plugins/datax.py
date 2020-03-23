@@ -11,7 +11,7 @@ import time
 import pytz
 
 from tempfile import NamedTemporaryFile
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, date
 from collections import OrderedDict
 from airflow.plugins_manager import AirflowPlugin
 from flask import Blueprint, request, redirect
@@ -43,6 +43,14 @@ from airflowext.datax_util import DataXConnectionInfo, RDMS2RDMSDataXJob
 
 
 SYNC_TYPES = ["增量同步", "全量同步"]
+
+
+def json_serial(obj):
+    """JSON serializer for objects not serializable by default json code"""
+
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    raise TypeError ("Type %s not serializable" % type(obj))
 
 
 def now_date(fmt):
@@ -99,6 +107,10 @@ class SyncDAGModel(DagModel):
             "tasks": json.loads(self.task_json_str),
             "append_column": append_column,
         }
+
+    @property
+    def tasks(self):
+        return json.loads(self.task_json_str)
 
     @property
     def state(self):
@@ -229,7 +241,8 @@ class RDMS2RDMSOperator(BaseOperator):
                             tar_source_from_column=self.tar_source_from_column,
                         )
         elif self.sync_type == "增量同步":
-            self.hook = RDBMS2RDBMSAppendHook(
+            self.hook = RDBMS2RDBMSAppendHook2(
+                            dag = self.dag,
                             task_id=task_id,
                             src_conn_id=self.src_conn_id,
                             src_query_sql=self.src_query_sql,
@@ -476,6 +489,209 @@ class RDBMS2RDBMSAppendHook(BaseHook):
                                 self.trans_conn_to_datax_conn(self.src_conn),
                                 self.trans_conn_to_datax_conn(self.tar_conn),
                                 self.generat_new_src_query_sql(),
+                                self.tmp_tar_table,
+                                self.tar_columns,
+                                self.generate_new_tar_pre_sql())
+        job.execute()
+
+
+class RDBMS2RDBMSAppendHook2(BaseHook):
+    """
+    Datax执行器: 增量同步
+
+    跟RDBMS2RDBMSAppendHook的区别是，以源库的时间作为同步基准
+    """
+
+    def __init__(self,
+                 dag,
+                 task_id,
+                 src_conn_id,
+                 src_query_sql,
+                 src_source_from,
+                 tar_conn_id,
+                 tar_table,
+                 tar_columns,
+                 append_column,
+                 tar_pkeys,
+                 tar_source_from_column):
+        self.dag = dag
+        self.task_id = task_id
+        self.src_conn = self.get_connection(src_conn_id)
+        self.src_query_sql = src_query_sql
+        self.src_source_from = src_source_from
+        self.tar_conn = self.get_connection(tar_conn_id)
+        self.tar_table = tar_table
+        self.tmp_tar_table = "tmp_append_%s" % tar_table
+        if src_source_from:
+            self.tmp_tar_table = self.tmp_tar_table + "_" + src_source_from.split(":")[0]
+        self.tar_columns = tar_columns
+        self.append_column = append_column
+        self.max_append_column_value = None
+        self.max_current_append_value = ""
+        self.tar_pkeys = tar_pkeys
+        self.tar_source_from_column = tar_source_from_column
+
+    def execute(self, context):
+        """
+        Execute
+        """
+        self.task_id = context['task_instance'].dag_id + "#" + context['task_instance'].task_id
+
+        self.drop_temp_table()
+        self.create_temp_table()
+        self.refresh_max_append_column_value()
+        self.refresh_new_src_query_sql()
+        self.run_datax_job()
+        self.migrate_temp_table_to_tar_table()
+        self.refresh_current_max_append_value()
+        self.drop_temp_table()
+        self.reset_max_append_value()
+
+    @provide_session
+    def refresh_max_append_column_value(self, session=None):
+        """
+        刷新增量字段的最大值
+        """
+        dag = session.query(SyncDAGModel).get(self.dag.dag_id)
+        task_name = self.task_id.split("#")[1]
+        for t in dag.tasks:
+            self.log.info("呵呵: (%s), (%s)", task_name, t["name"])
+            if t["name"] != task_name:
+                continue
+            self.max_append_column_value = t.get("max_append_value", "1997-01-01")
+            break
+        self.log.info("增量字段最大值：%s" % self.max_append_column_value)
+        return self.max_append_column_value
+
+    @provide_session
+    def reset_max_append_value(self, session=None):
+        """
+        刷新增量字段的最大值
+        """
+        dag = session.query(SyncDAGModel).get(self.dag.dag_id)
+        task_name = self.task_id.split("#")[1]
+        tasks = dag.tasks
+        for t in tasks:
+            if t["name"] != task_name:
+                continue
+            t["max_append_value"] = self.max_current_append_value or self.max_append_column_value
+            dag.task_json_str = json.dumps(tasks)
+            self.log.info("重置%s" % dag.task_json_str)
+            session.commit()
+            break
+
+    def refresh_current_max_append_value(self):
+        """
+        刷新本次增量字段的最大值
+        """
+        where = ""
+        if self.tar_source_from_column:
+            where = "%s='%s'" % (self.tar_source_from_column, self.src_source_from)
+
+        sql = "SELECT max(%s) FROM %s " % (self.append_column, self.tmp_tar_table)
+        if where:
+            sql = sql + " WHERE " + where
+
+        with create_external_session(self.tar_conn) as sess:
+            result = sess.execute(sql)
+        record = result.fetchone()
+        if record:
+            self.max_current_append_value = record[0].strftime("%Y-%m-%d %H:%M:%S")
+        return self.max_current_append_value
+
+    def create_temp_table(self):
+        """
+        创建用于增量同步的临时表
+        """
+        create_sql = "CREATE TABLE {new_table} AS (SELECT * FROM {old_table} WHERE 1=2)"
+        if self.tar_conn.conn_type.strip()  in ["mssql", "sqlserver"]:
+            create_sql = "Select * into {new_table} from {old_table} WHERE 1=2"
+
+        data = {
+            "new_table": self.tmp_tar_table,
+            "old_table": self.tar_table
+        }
+        create_sql = create_sql.format(**data)
+        with create_external_session(self.tar_conn) as sess:
+            sess.execute(create_sql)
+
+    def drop_temp_table(self):
+        """
+        删掉临时表
+        """
+        drop_sql = "DROP TABLE IF EXISTS {table}"
+        if self.tar_conn.conn_type.strip()  in ["mssql", "sqlserver"]:
+            drop_sql = """
+            IF EXISTS
+                (SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = '{table}')
+                DROP TABLE {table}
+            """
+        drop_sql = drop_sql.format(table=self.tmp_tar_table)
+        with create_external_session(self.tar_conn) as sess:
+            sess.execute(drop_sql)
+
+    def migrate_temp_table_to_tar_table(self):
+        """
+        把数据从临时表迁移到正式表
+        分为两步：
+            1. 把更新的行同步过去
+            2. 把新增的行同步过去
+        """
+        set_caluse = ",".join(["%s=b.%s" % (c, c) for c in self.tar_columns])
+        pkeys_caluse = " AND ".join(["a.%s=b.%s" % (c, c) for c in self.tar_pkeys])
+        pkeys_caluse2 = " AND ".join(["%s=tmp.%s" % (c, c) for c in self.tar_pkeys])
+        columns = ",".join(['"%s"' % c for c in self.tar_columns])
+        data = {
+            "table": self.tar_table,
+            "temp": self.tmp_tar_table,
+            "set_caluse": set_caluse,
+            "pkeys_caluse": pkeys_caluse,
+            "pkeys_caluse2": pkeys_caluse2,
+            "columns": columns,
+        }
+
+        update_sql = """UPDATE {table} a SET {set_caluse} FROM {temp} b WHERE {pkeys_caluse}"""
+        update_sql = update_sql.format(**data)
+        insert_sql = """INSERT INTO {table} ({columns}) (SELECT {columns} FROM {temp} tmp WHERE not exists (SELECT 1 FROM {table} WHERE {pkeys_caluse2}));"""
+        insert_sql = insert_sql.format(**data)
+        with create_external_session(self.tar_conn) as sess:
+            self.log.info("migrate_temp_table_to_tar_table start")
+            self.log.info("migrate_temp_table_to_tar_table update_sql: %s", update_sql)
+            t1 = time.time()
+            sess.execute(update_sql)
+            self.log.info("migrate_temp_table_to_tar_table insert_sql: %s", insert_sql)
+            sess.execute(insert_sql)
+            self.log.info("migrate_temp_table_to_tar_table end")
+
+    def trans_conn_to_datax_conn(self, conn):
+        return DataXConnectionInfo(
+            conn.conn_type,
+            conn.host.strip(),
+            str(conn.port),
+            conn.schema.strip(),
+            conn.login.strip(),
+            conn.password.strip(),
+        )
+
+    def refresh_new_src_query_sql(self):
+        if self.max_append_column_value:
+            sql = "SELECT * FROM ({}) as main_ WHERE main_.{} >= '{}'"
+            sql = sql.format(self.src_query_sql,
+                            self.append_column,
+                            self.max_append_column_value)
+            self.new_src_query_sql = sql
+        else:
+            self.new_src_query_sql = self.src_query_sql
+
+
+    def generate_new_tar_pre_sql(self):
+        return ""
+
+    def run_datax_job(self):
+        job = RDMS2RDMSDataXJob(self.task_id,
+                                self.trans_conn_to_datax_conn(self.src_conn),
+                                self.trans_conn_to_datax_conn(self.tar_conn),
+                                self.new_src_query_sql,
                                 self.tmp_tar_table,
                                 self.tar_columns,
                                 self.generate_new_tar_pre_sql())
@@ -880,7 +1096,7 @@ class DataXPlugin(AirflowPlugin):
     name = "datax"
     operators = [RDMS2RDMSOperator]
     sensors = [PluginSensorOperator]
-    hooks = [RDBMS2RDBMSFullHook, RDBMS2RDBMSAppendHook]
+    hooks = [RDBMS2RDBMSFullHook, RDBMS2RDBMSAppendHook2]
     executors = [PluginExecutor]
     macros = [plugin_macro]
     # admin_views = [datax_view]
