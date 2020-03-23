@@ -94,14 +94,13 @@ class SyncDAGModel(DagModel):
     __mapper_args__ = {'polymorphic_identity': 'sync_dag'}
     sync_dag_id = Column(String(ID_LEN),
                          ForeignKey('dag.dag_id'), primary_key=True)
-    sync_type = Column(String(50))
+    sync_type = Column(String(50))  # 已废除
     task_json_str = Column(String(50000), default="[]")
 
     def to_json(self):
         append_column = "write_date"
         return {
             "name": self.dag_id,
-            "sync_type": self.sync_type,
             "interval": dump_interval(self.schedule_interval),
             "state": self.state,
             "tasks": json.loads(self.task_json_str),
@@ -132,6 +131,8 @@ class SyncDAGModel(DagModel):
             tasks.append(OrderedDict({
                 "name": t["name"],
                 "parent": t["pre_task"],
+                "sync_type": t["sync_type"],
+                "append_basis": t["append_basis"],
                 "source": {
                     "conn_id": t["source"]["conn_id"],
                     "query_sql": t["source"]["query_sql"],
@@ -148,7 +149,6 @@ class SyncDAGModel(DagModel):
 
         data = OrderedDict({
             "name": self.dag_id,
-            "sync_type": self.sync_type,
             "interval": dump_interval(self.schedule_interval),
             "tasks": tasks
         })
@@ -161,6 +161,8 @@ class SyncDAGModel(DagModel):
             tasks.append(OrderedDict({
                 "name": t["name"],
                 "pre_task": t["parent"],
+                "sync_type": t["sync_type"],
+                "append_basis": t["append_basis"],
                 "source": {
                     "conn_id": t["source"]["conn_id"],
                     "query_sql": t["source"]["query_sql"],
@@ -177,7 +179,6 @@ class SyncDAGModel(DagModel):
 
         data = OrderedDict({
             "name": raw["name"],
-            "sync_type": raw["sync_type"],
             "interval": raw["interval"],
             "tasks": tasks
         })
@@ -191,6 +192,7 @@ class RDMS2RDMSOperator(BaseOperator):
     @apply_defaults
     def __init__(self,
                  sync_type,
+                 append_basis,
                  src_conn_id,
                  src_query_sql,
                  src_source_from,
@@ -216,6 +218,7 @@ class RDMS2RDMSOperator(BaseOperator):
         self.tar_table = tar_table
         self.tar_columns = tar_columns
         self.append_column = append_column
+        self.append_basis = append_basis or "目的库时间"
         self.tar_pkeys = [c.strip() for c in tar_pkeys.split(",") if c.strip()]
         if not self.tar_pkeys:
             self.tar_pkeys = ["id"]
@@ -241,19 +244,34 @@ class RDMS2RDMSOperator(BaseOperator):
                             tar_source_from_column=self.tar_source_from_column,
                         )
         elif self.sync_type == "增量同步":
-            self.hook = RDBMS2RDBMSAppendHook2(
-                            dag = self.dag,
-                            task_id=task_id,
-                            src_conn_id=self.src_conn_id,
-                            src_query_sql=self.src_query_sql,
-                            src_source_from=self.src_source_from,
-                            tar_conn_id=self.tar_conn_id,
-                            tar_table=self.tar_table,
-                            tar_columns=self.tar_columns,
-                            append_column=self.append_column,
-                            tar_pkeys=self.tar_pkeys,
-                            tar_source_from_column=self.tar_source_from_column,
-                        )
+            if self.append_basis == "源库时间":
+                self.hook = RDBMS2RDBMSAppendHook2(
+                                dag=self.dag,
+                                task_id=task_id,
+                                src_conn_id=self.src_conn_id,
+                                src_query_sql=self.src_query_sql,
+                                src_source_from=self.src_source_from,
+                                tar_conn_id=self.tar_conn_id,
+                                tar_table=self.tar_table,
+                                tar_columns=self.tar_columns,
+                                append_column=self.append_column,
+                                tar_pkeys=self.tar_pkeys,
+                                tar_source_from_column=self.tar_source_from_column,
+                            )
+            else:
+                self.hook = RDBMS2RDBMSAppendHook(
+                                dag=self.dag,
+                                task_id=task_id,
+                                src_conn_id=self.src_conn_id,
+                                src_query_sql=self.src_query_sql,
+                                src_source_from=self.src_source_from,
+                                tar_conn_id=self.tar_conn_id,
+                                tar_table=self.tar_table,
+                                tar_columns=self.tar_columns,
+                                append_column=self.append_column,
+                                tar_pkeys=self.tar_pkeys,
+                                tar_source_from_column=self.tar_source_from_column,
+                            )
         self.hook.execute(context=context)
 
     def on_kill(self):
@@ -595,7 +613,7 @@ class RDBMS2RDBMSAppendHook2(BaseHook):
         with create_external_session(self.tar_conn) as sess:
             result = sess.execute(sql)
         record = result.fetchone()
-        if record:
+        if record[0]:
             self.max_current_append_value = record[0].strftime("%Y-%m-%d %H:%M:%S")
         return self.max_current_append_value
 
@@ -771,7 +789,6 @@ class SyncDAGListView(MethodView):
 
         dag = SyncDAGModel(
             dag_id=name,
-            sync_type=params["sync_type"],
             owners="luke",
             schedule_interval=interval,
             fileloc="",
@@ -832,7 +849,6 @@ class SyncDAGDetailView(MethodView):
                 "msg": "不存在名为%s的dag" % dag_id
             })
         params = json.loads(request.data)
-        dag.sync_type = params["sync_type"]
         dag.schedule_interval = load_interval(params["interval"])
         dag.task_json_str = json.dumps(params["tasks"])
         session.commit()
@@ -942,7 +958,6 @@ def import_dag_from_file(session=None):
 
     dag = SyncDAGModel(
         dag_id=name,
-        sync_type=data["sync_type"],
         owners="luke",
         schedule_interval=interval,
         fileloc="",
@@ -985,7 +1000,6 @@ def export_dag(dag_id, session=None):
 @bp.route("/datax/api/dag/<dag_id>/trigger", methods=["POST"])
 @provide_session
 def trigger_dag(dag_id, session=None):
-    #dag_id = request.values.get('dag_id')
     dag = session.query(DagModel).filter(DagModel.dag_id == dag_id).first()
     if not dag:
         return jsonify({
@@ -1002,8 +1016,19 @@ def trigger_dag(dag_id, session=None):
             "code": -1,
             "msg": "This run_id {} already exists".format(run_id)
         })
-    run_conf = {}
 
+    dr = DagRun.find(dag_id=dag_id, state="running")
+    print("*********")
+    print(dr)
+    if len(dr) > 1:
+        obj = dr[-1]
+        return jsonify({
+            "code": 0,
+            "msg": "SUCCESS",
+            "run_id": obj.run_id,
+        })
+
+    run_conf = {}
     dag.create_dagrun(
         run_id=run_id,
         execution_date=execution_date,
@@ -1018,6 +1043,7 @@ def trigger_dag(dag_id, session=None):
         "run_id": run_id,
     })
 
+
 @bp.route("/datax/api/dag/<dag_id>/runinfo", methods=["GET"])
 @provide_session
 def get_dag_run_info(dag_id, session=None):
@@ -1031,6 +1057,7 @@ def get_dag_run_info(dag_id, session=None):
     return jsonify({
         "code": 0,
         "msg": "SUCCESS",
+        "latest_success_start_date": latest_success.start_date.strftime("%Y-%m-%d %H:%M:%S"),
         "latest_success_execution_date": latest_success.execution_date.strftime("%Y-%m-%d %H:%M:%S"),
         "latest_sucdess_run_id": latest_success.run_id,
     })
@@ -1052,7 +1079,6 @@ class DataXDAGView(AppBuilderBaseView):
         for dag in qs:
             dags.append({
                 "name": dag.dag_id,
-                "sync_type": dag.sync_type,
                 "interval": dump_interval(dag.schedule_interval),
                 "state": dag.state,
             })

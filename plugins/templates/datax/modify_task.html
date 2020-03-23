@@ -26,14 +26,6 @@
             <input type="text" readonly class="head_input form-control task_name" value="{{dag.name}}">
         </li>
         <li class="li_label">
-            <label class="label_left">同步类型</label>
-            <select id="sync_type_select" name="state" class="head_input selectpicker bs-select-hidden">
-                {% for v in sync_types %}
-                <option value="{{v}}" {%if dag.sync_type==v %} selected = "selected" {%endif%}>{{v}}</option>
-                {% endfor %}
-            </select>
-        </li>
-        <li class="li_label">
                 <label class="label_left">时间间隔</label>
                 <input type="text" class="time_interval_input form-control" value="{{dag.interval_time}}">
                 <select name="state" class="time_interval_select selectpicker bs-select-hidden">
@@ -142,6 +134,8 @@
                 var $card = $(card);
                 subTask.name = $card.find('.sub_task_name').val();
                 subTask.pre_task = $card.find('.pre_task_select').val();
+                subTask.sync_type = $card.find('.sync_type').val();
+                subTask.append_basis = $card.find('.append_basis').val();
                 subTask.source = {
                     'conn_id': $card.find('.sql_input_select').val(),
                     'query_sql': $card.find('.sql_input_area').val(),

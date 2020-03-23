@@ -59,7 +59,6 @@ def generate_dag_file(data):
             t["append_column"] = "write_date"
 
     content = template.render(
-        sync_type=data["sync_type"],
         append_column=data["append_column"],
         name=data["name"],
         owner="luke",
@@ -82,10 +81,10 @@ if __name__ == "__main__":
         "interval": "20s",
         "name": "test",
         "state": "禁用",
-        "sync_type": "全量同步",
         "tasks": [
             {
                 "name": "同步表1",
+                "sync_type": "全量同步",
                 "pre_task": "SELECT",
                 "source": {
                     "conn_id": "src_conn",

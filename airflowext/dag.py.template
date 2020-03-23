@@ -30,7 +30,8 @@ dag = DAG(
 {% for t in tasks %}
 
 {{t.name}} = RDMS2RDMSOperator(
-    sync_type='{{sync_type}}',
+    sync_type='{{t.sync_type}}',
+    append_basis='{{t.append_basis}}',
     task_id="{{t.name}}",
     src_conn_id="{{t.source.conn_id}}",
     src_query_sql="""{{t.source.query_sql}}""",

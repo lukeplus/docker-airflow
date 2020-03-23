@@ -122,6 +122,14 @@
                             '<input type="text" class="head_input form-control sub_task_name">' +
                         '</li>' +
                         '<li class="li_label">' +
+                            '<label class="label_left">同步类型</label>' +
+                            '<select name="sync_type" class="head_input selectpicker sync_type"><option value="增量同步">增量同步</option><option value="全量同步">全量同步</option></select>' +
+                        '</li>' +
+                        '<li class="li_label">' +
+                            '<label class="label_left">增量依据</label>' +
+                            '<select name="append_basis" class="head_input selectpicker append_basis"><option value="源库时间">源库时间</option><option value="目的库时间">目的库时间</option></select>' +
+                        '</li>' +
+                        '<li class="li_label">' +
                             '<label class="label_left">前置任务</label>' +
                             '<select name="state" class="head_input selectpicker pre_task_select"></select>' +
                         '</li>' +
@@ -277,6 +285,8 @@
                 $row.find('.sql_top_input').val(rowValue.source.source_from);
                 $row.find('.target_pkey_input').val(rowValue.target.pkeys);
                 $row.find('.target_source_from_input').val(rowValue.target.source_from_column);
+                $row.find('.sync_type').selectpicker('val', rowValue.sync_type);
+                $row.find('.append_basis').selectpicker('val', rowValue.append_basis);
             },
             setRowPreTaskValue: function() {
                 var $row = this.$ele;

@@ -21,14 +21,6 @@
             <input type="text" class="head_input form-control task_name">
         </li>
         <li class="li_label">
-            <label class="label_left">同步类型</label>
-            <select id="sync_type_select" name="state" class="head_input selectpicker bs-select-hidden">
-                {% for v in sync_types %}
-                <option value="{{v}}">{{v}}</option>
-                {% endfor %}
-            </select>
-        </li>
-        <li class="li_label">
             <label class="label_left">时间间隔</label>
             <input type="text" class="time_interval_input form-control">
             <select name="state" class="time_interval_select selectpicker bs-select-hidden">
@@ -125,9 +117,9 @@
         var taskCard = $('.subtask_list_wrapper').subTaskCard({
             ele: $('.subtask_list_wrapper'),
         });
-        
+
         subTaskNameInputBlur(taskCard.$ele.find('.sub_task_name'));
-       
+
         // 绑定添加子任务事件
         $('.add_new_sub_task').click(function() {
             var taskCard = $('.subtask_list_wrapper').subTaskCard({
@@ -157,7 +149,7 @@
                 }
             });
         }
-        
+
         // 保存事件
         $('.save_sub_task').click(function(){
             postTaskData();
@@ -175,6 +167,8 @@
                 var $card = $(card);
                 subTask.name = $card.find('.sub_task_name').val();
                 subTask.pre_task = $card.find('.pre_task_select').val();
+                subTask.sync_type = $card.find('.sync_type').val();
+                subTask.append_basis = $card.find('.append_basis').val();
                 subTask.source = {
                     'conn_id': $card.find('.sql_input_select').val(),
                     'query_sql': $card.find('.sql_input_area').val()
@@ -193,7 +187,7 @@
             $.ajax({
                 type: "post",
                 url: postTaskUrl,
-                async: false, 
+                async: false,
                 data: JSON.stringify(data),
                 contentType: "application/json; charset=utf-8",
                 dataType: "json",
@@ -201,6 +195,6 @@
                 }
             });
         }
-        
+
     </script>
 {% endblock %}
