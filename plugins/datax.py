@@ -172,7 +172,7 @@ class SyncDAGModel(DagModel):
                     "conn_id": t["target"]["conn_id"],
                     "table": t["target"]["table"],
                     "columns": t["target"]["columns"],
-                    "source_from_column": t["source"].get("source_from_column", ""),
+                    "source_from_column": t["target"].get("source_from_column", ""),
                     "pkeys": t["target"].get("primary_key", "")
                 },
             }))
