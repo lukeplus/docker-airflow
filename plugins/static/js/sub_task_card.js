@@ -127,7 +127,7 @@
                         '</li>' +
                         '<li class="li_label">' +
                             '<label class="label_left">增量依据</label>' +
-                            '<select name="append_basis" class="head_input selectpicker append_basis"><option value="源库时间">源库时间</option><option value="目的库时间">目的库时间</option></select>' +
+                            '<select name="append_basis" class="head_input selectpicker append_basis"><option value="目的库时间">目的库时间</option><option value="源库时间">源库时间</option></select>' +
                         '</li>' +
                         '<li class="li_label">' +
                             '<label class="label_left">前置任务</label>' +

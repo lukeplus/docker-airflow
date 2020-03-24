@@ -359,6 +359,7 @@ class RDBMS2RDBMSAppendHook(BaseHook):
     """
 
     def __init__(self,
+                 dag,
                  task_id,
                  src_conn_id,
                  src_query_sql,
@@ -370,6 +371,7 @@ class RDBMS2RDBMSAppendHook(BaseHook):
                  tar_pkeys,
                  tar_source_from_column):
         self.task_id = task_id
+        self.dag = dag
         self.src_conn = self.get_connection(src_conn_id)
         self.src_query_sql = src_query_sql
         self.src_source_from = src_source_from
