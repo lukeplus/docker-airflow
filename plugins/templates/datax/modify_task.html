@@ -84,6 +84,8 @@
                 ele: $('.subtask_list_wrapper'),
             });
             subTaskNameInputBlur(taskCard.$ele.find('.sub_task_name'));
+            $('.sync_type').selectpicker('refresh');
+            $('.append_basis').selectpicker('refresh');
         });
 
         // 子任务名称填写失焦
