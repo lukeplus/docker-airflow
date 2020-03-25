@@ -12,7 +12,7 @@ ul, li {
 }
 .add_task_head {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
     padding: 40px 0 30px;
     border-bottom: 1px solid #e5e5e5;
 }
@@ -21,11 +21,11 @@ ul, li {
 }
 li.li_label {
     display: flex;
-    width: 30%;
+    width: 33%;
     align-items: center;
 }
 .label_left {
-    width: 30%;
+    width: 20%;
 }
 .add_task_head .head_input, .bootstrap-select {
     width: 50%!important;
@@ -42,7 +42,7 @@ li.li_label {
 .subtask_list_card_nav {
     display: flex;
     margin-bottom: 20px;
-    justify-content: space-between;
+    justify-content: flex-start;
 }
 .subtask_list_card_nav .head_input, .bootstrap-select {
     width: 50%!important;
@@ -109,7 +109,7 @@ li.li_label {
     width: 30%!important;
 }
 .time_interval_select {
-    width: 20%!important;
+    width: 18%!important;
     margin-left: 10px!important;
 }
 .source_li {
@@ -126,4 +126,7 @@ li.li_label {
 }
 .import_file {
     display: inline-block!important;
+}
+.reset_append_value {
+    margin-left: 10px;
 }
