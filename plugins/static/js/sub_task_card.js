@@ -122,6 +122,12 @@
                             '<input type="text" class="head_input form-control sub_task_name">' +
                         '</li>' +
                         '<li class="li_label">' +
+                            '<label class="label_left">前置任务</label>' +
+                            '<select name="state" class="head_input selectpicker pre_task_select"></select>' +
+                        '</li>' +
+                    '</ul>' +
+                    '<ul class="subtask_list_card_nav">' +
+                        '<li class="li_label">' +
                             '<label class="label_left">同步类型</label>' +
                             '<select name="sync_type" class="head_input selectpicker sync_type"><option value="增量同步">增量同步</option><option value="全量同步">全量同步</option></select>' +
                         '</li>' +
@@ -130,10 +136,9 @@
                             '<select name="append_basis" class="head_input selectpicker append_basis"><option value="目的库时间">目的库时间</option><option value="源库时间">源库时间</option></select>' +
                         '</li>' +
                         '<li class="li_label">' +
-                            '<label class="label_left">前置任务</label>' +
-                            '<select name="state" class="head_input selectpicker pre_task_select"></select>' +
+                            '<label class="label_left">增量时间</label>' +
+                            '<input type="text" class="head_input form-control max_append_value" disabled>' +
                         '</li>' +
-                        '<li class="li_label"></li>' +
                     '</ul>' +
                     '<ul class="subtask_list_content">' +
                         '<li class="subtask_list_item">' +
@@ -281,6 +286,7 @@
             setRowStaticValue: function(rowValue) {
                 var $row = this.$ele;
                 $row.find('.sub_task_name').val(rowValue.name);
+                $row.find('.max_append_value').val(rowValue.max_append_value);
                 $row.find('.sql_input_area').val(rowValue.source.query_sql);
                 $row.find('.sql_top_input').val(rowValue.source.source_from);
                 $row.find('.target_pkey_input').val(rowValue.target.pkeys);
