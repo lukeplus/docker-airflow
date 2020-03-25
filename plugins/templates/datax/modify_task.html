@@ -26,15 +26,16 @@
             <input type="text" readonly class="head_input form-control task_name" value="{{dag.name}}">
         </li>
         <li class="li_label">
-                <label class="label_left">时间间隔</label>
-                <input type="text" class="time_interval_input form-control" value="{{dag.interval_time}}">
-                <select name="state" class="time_interval_select selectpicker bs-select-hidden">
-                    <option value="d" {% if dag.interval_time_type== 'd' %}selected = "selected"{%endif%}>天</option>
-                    <option value="h" {% if dag.interval_time_type== 'h' %}selected = "selected"{%endif%}>时</option>
-                    <option value="m" {% if dag.interval_time_type== 'm' %}selected = "selected"{%endif%}>分</option>
-                    <option value="s" {% if dag.interval_time_type== 's' %}selected = "selected"{%endif%}>秒</option>
-                </select>
-            </li>
+            <label class="label_left">时间间隔</label>
+            <input type="text" class="time_interval_input form-control" value="{{dag.interval_time}}">
+            <select name="state" class="time_interval_select selectpicker bs-select-hidden">
+                <option value="d" {% if dag.interval_time_type== 'd' %}selected = "selected"{%endif%}>天</option>
+                <option value="h" {% if dag.interval_time_type== 'h' %}selected = "selected"{%endif%}>时</option>
+                <option value="m" {% if dag.interval_time_type== 'm' %}selected = "selected"{%endif%}>分</option>
+                <option value="s" {% if dag.interval_time_type== 's' %}selected = "selected"{%endif%}>秒</option>
+            </select>
+        </li>
+        <li class="li_label"></li>
     </ul>
     <ul class="subtask_list_wrapper">
 
@@ -164,6 +165,7 @@
                 dataType:"json",
                 success: function(result){
                     // 成功后的操作
+                    alert('保存成功');
                 },
                 error: function() {
                     alert('更新失败，请重试！');

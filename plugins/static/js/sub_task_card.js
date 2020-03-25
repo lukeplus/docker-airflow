@@ -139,6 +139,7 @@
                         '<li class="li_label">' +
                             '<label class="label_left">增量时间</label>' +
                             '<input type="text" class="head_input form-control max_append_value" disabled>' +
+                            '<a class="reset_append_value">重置</a>' +
                         '</li>' +
                     '</ul>' +
                     '<ul class="subtask_list_content">' +
@@ -272,6 +273,13 @@
                     var newFieldWrap = $(ev.target).parents('.target_field_wrap').find('.target_field_column_wrap');
                     self.addNewField(newFieldWrap);
                 });
+
+                // 增量时间重置事件
+                this.$ele.find('.reset_append_value').click(function(ev){
+                    var inputBox = $(ev.target).parents('.li_label').find('.max_append_value');
+                    inputBox.val("");
+                });
+
             },
             addNewField: function ($wrap){
                 var self = this;
