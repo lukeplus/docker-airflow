@@ -140,7 +140,7 @@
                     }
                 });
                 $appendBasis.on('changed.bs.select', function (e) {
-                    if (e.target.value !== '目的库时间') {
+                    if (e.target.value !== '源库时间') {
                         $maxAppend.css('display', 'none');
                     } else {
                         $maxAppend.css('display', 'flex');
@@ -149,7 +149,7 @@
                 if ($sync.val() !== '增量同步') {
                     $appendBasis.css('display', 'none');
                     $maxAppend.css('display', 'none');
-                } else if ($nav.find('.append_basis').val() !== '目的库时间') {
+                } else if ($nav.find('.append_basis').val() !== '源库时间') {
                     $maxAppend.css('display', 'none');
                 }
             });
