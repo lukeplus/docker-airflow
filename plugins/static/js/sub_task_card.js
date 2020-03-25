@@ -125,6 +125,7 @@
                             '<label class="label_left">前置任务</label>' +
                             '<select name="state" class="head_input selectpicker pre_task_select"></select>' +
                         '</li>' +
+                        '<li class="li_label"></li>' +
                     '</ul>' +
                     '<ul class="subtask_list_card_nav">' +
                         '<li class="li_label">' +
