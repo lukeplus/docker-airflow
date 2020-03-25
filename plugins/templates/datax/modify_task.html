@@ -72,6 +72,7 @@
                     });
                     addPreTaskOptions();
                     setPreTaskValue();
+                    hideInvisibleSelectBox();
                 }
             },
             error: function() {
@@ -87,6 +88,7 @@
             subTaskNameInputBlur(taskCard.$ele.find('.sub_task_name'));
             $('.sync_type').selectpicker('refresh');
             $('.append_basis').selectpicker('refresh');
+            hideInvisibleSelectBox();
         });
 
         // 子任务名称填写失焦
@@ -118,6 +120,38 @@
         function setPreTaskValue() {
             $.each($('select.pre_task_select'), function(index, select){
                 $(select).selectpicker('val', tasks[index].pre_task);
+            });
+        }
+
+        function hideInvisibleSelectBox() {
+            var secNavs = $('.subtask_list_card_sec_nav');
+            $.each(secNavs, function(index, nav){
+                var $nav = $(nav);
+                var $sync = $nav.find('.sync_type');
+                var $appendBasis = $nav.find('.append_basis').parents('.li_label');
+                var $maxAppend = $nav.find('.max_append_value').parents('.li_label');
+                $sync.on('changed.bs.select', function (e) {
+                    if (e.target.value !== '增量同步') {
+                        $appendBasis.css('display', 'none');
+                        $maxAppend.css('display', 'none');
+                    } else {
+                        $appendBasis.css('display', 'flex');
+                        $maxAppend.css('display', 'flex');
+                    }
+                });
+                $appendBasis.on('changed.bs.select', function (e) {
+                    if (e.target.value !== '目的库时间') {
+                        $maxAppend.css('display', 'none');
+                    } else {
+                        $maxAppend.css('display', 'flex');
+                    }
+                });
+                if ($sync.val() !== '增量同步') {
+                    $appendBasis.css('display', 'none');
+                    $maxAppend.css('display', 'none');
+                } else if ($nav.find('.append_basis').val() !== '目的库时间') {
+                    $maxAppend.css('display', 'none');
+                }
             });
         }
 
