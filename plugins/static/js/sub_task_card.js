@@ -205,6 +205,10 @@
                                         '</li>' +
                                     '</ul>' +
                                     '<button class="btn btn-primary add_new_field">+添加新字段</button>' +
+                                    '<div class="source_li">' +
+                                        '<label class="source_label">postSql</label>' +
+                                        '<textarea class="form-control post_sql_input_area" rows="5" name="textarea"></textarea>' +
+                                    '</div>' +
                                 '</div>' +
                             '</div>' +
                         '</li>' +
@@ -296,6 +300,7 @@
                 $row.find('.sub_task_name').val(rowValue.name);
                 $row.find('.max_append_value').val(rowValue.max_append_value);
                 $row.find('.sql_input_area').val(rowValue.source.query_sql);
+                $row.find('.post_sql_input_area').val(rowValue.target.post_sql);
                 $row.find('.sql_top_input').val(rowValue.source.source_from);
                 $row.find('.target_pkey_input').val(rowValue.target.pkeys);
                 $row.find('.target_source_from_input').val(rowValue.target.source_from_column);

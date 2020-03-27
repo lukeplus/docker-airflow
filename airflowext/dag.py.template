@@ -7,6 +7,7 @@
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.datax import RDMS2RDMSOperator
+from airflowext.callback import main_failure_handler, main_retry_handler, main_success_handler
 
 
 default_args = {
@@ -17,7 +18,10 @@ default_args = {
     'email_on_failure': False,
     'email_on_retry': False,
     'retries': {{retries}},
-    # 'retry_delay': timedelta(minutes=5),
+    'on_failure_callback': main_failure_handler,
+    'on_success_callback': main_success_handler,
+    'on_retry_callback': main_retry_handler,
+    'retry_delay': timedelta(seconds=30),
     # 'queue': 'bash_queue',
     # 'pool': 'backfill',
     # 'priority_weight': 10,
@@ -42,6 +46,7 @@ dag = DAG(
     append_column='{{t.append_column}}',
     tar_pkeys='{{t.target.pkeys}}',
     tar_source_from_column='{{t.target.source_from_column}}',
+    tar_post_sql_lsit={{t.target.post_sql_list}},
     dag=dag,
 )
 {% endfor %}

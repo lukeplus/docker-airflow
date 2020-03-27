@@ -57,6 +57,7 @@ def generate_dag_file(data):
         #     t["append_column"] = "start_time"
         else:
             t["append_column"] = "write_date"
+            t["target"]["post_sql_list"] = [sql.strip() for sql in t["target"].get("post_sql", "").split(";") if sql.strip()]
 
     content = template.render(
         append_column=data["append_column"],

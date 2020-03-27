@@ -179,7 +179,7 @@ class RDMS2RDMSDataXJob(DataXJob):
     def __init__(self, job_id, src_conn,
                  tar_conn, src_query_sql,
                  tar_table, tar_columns,
-                 tar_pre_sql):
+                 tar_pre_sql, tar_post_sql_list):
         """
         :param src_conn: `ConnectionInfo`,  source database connection information
         :param tar_conn: `ConnectionInfo`,  target database connection information
@@ -191,6 +191,7 @@ class RDMS2RDMSDataXJob(DataXJob):
         self.tar_table = tar_table
         self.tar_columns = tar_columns
         self.tar_pre_sql = tar_pre_sql
+        self.tar_post_sql_list = tar_post_sql_list
 
     def generate_reader(self):
         """
@@ -231,6 +232,7 @@ class RDMS2RDMSDataXJob(DataXJob):
                 "preSql": [
                     self.tar_pre_sql
                 ],
+                "postsql": self.tar_post_sql_list,
                 "connection": [{
                     "jdbcUrl": conn.jdbc_url,
                     "table": [self.tar_table]

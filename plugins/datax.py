@@ -143,7 +143,8 @@ class SyncDAGModel(DagModel):
                     "table": t["target"]["table"],
                     "columns": t["target"]["columns"],
                     "source_from_column": t["target"].get("source_from_column", ""),
-                    "primary_key": t["target"].get("pkeys", "")
+                    "primary_key": t["target"].get("pkeys", ""),
+                    "post_sql": t["target"].get("postsql", "")
                 },
             }))
 
@@ -173,7 +174,8 @@ class SyncDAGModel(DagModel):
                     "table": t["target"]["table"],
                     "columns": t["target"]["columns"],
                     "source_from_column": t["target"].get("source_from_column", ""),
-                    "pkeys": t["target"].get("primary_key", "")
+                    "pkeys": t["target"].get("primary_key", ""),
+                    "post_sql": t["target"].get("postsql", "")
                 },
             }))
 
@@ -202,6 +204,7 @@ class RDMS2RDMSOperator(BaseOperator):
                  append_column,
                  tar_pkeys,
                  tar_source_from_column,
+                 tar_post_sql_list,
                  *args,
                  **kwargs):
         """
@@ -223,6 +226,7 @@ class RDMS2RDMSOperator(BaseOperator):
         if not self.tar_pkeys:
             self.tar_pkeys = ["id"]
         self.tar_source_from_column = tar_source_from_column
+        self.tar_post_sql_list = tar_post_sql_list
 
     def execute(self, context):
         """
@@ -242,6 +246,7 @@ class RDMS2RDMSOperator(BaseOperator):
                             tar_columns=self.tar_columns,
                             tar_pkeys=self.tar_pkeys,
                             tar_source_from_column=self.tar_source_from_column,
+                            tar_post_sql_list=self.tar_post_sql_list
                         )
         elif self.sync_type == "增量同步":
             if self.append_basis == "源库时间":
@@ -257,6 +262,7 @@ class RDMS2RDMSOperator(BaseOperator):
                                 append_column=self.append_column,
                                 tar_pkeys=self.tar_pkeys,
                                 tar_source_from_column=self.tar_source_from_column,
+                                tar_post_sql_list=self.tar_post_sql_list
                             )
             else:
                 self.hook = RDBMS2RDBMSAppendHook(
@@ -271,6 +277,7 @@ class RDMS2RDMSOperator(BaseOperator):
                                 append_column=self.append_column,
                                 tar_pkeys=self.tar_pkeys,
                                 tar_source_from_column=self.tar_source_from_column,
+                                tar_post_sql_list=self.tar_post_sql_list
                             )
         self.hook.execute(context=context)
 
@@ -293,7 +300,8 @@ class RDBMS2RDBMSFullHook(BaseHook):
                  tar_table,
                  tar_columns,
                  tar_pkeys,
-                 tar_source_from_column):
+                 tar_source_from_column,
+                 tar_post_sql_list):
         self.task_id = task_id
         self.src_conn = self.get_connection(src_conn_id)
         self.src_query_sql = src_query_sql
@@ -303,7 +311,7 @@ class RDBMS2RDBMSFullHook(BaseHook):
         self.tar_columns = tar_columns
         self.tar_pkeys = tar_pkeys
         self.tar_source_from_column = tar_source_from_column
-
+        self.tar_post_sql_list = []
         self.init()
 
     def cal_source_from_value(self):
@@ -349,7 +357,8 @@ class RDBMS2RDBMSFullHook(BaseHook):
                                 self.src_query_sql,
                                 self.tar_table,
                                 self.tar_columns,
-                                self.tar_pre_sql)
+                                self.tar_pre_sql,
+                                self.tar_post_sql_list)
         job.execute()
 
 
@@ -369,7 +378,8 @@ class RDBMS2RDBMSAppendHook(BaseHook):
                  tar_columns,
                  append_column,
                  tar_pkeys,
-                 tar_source_from_column):
+                 tar_source_from_column,
+                 tar_post_sql_list):
         self.task_id = task_id
         self.dag = dag
         self.src_conn = self.get_connection(src_conn_id)
@@ -385,6 +395,7 @@ class RDBMS2RDBMSAppendHook(BaseHook):
         self.max_append_column_value = None
         self.tar_pkeys = tar_pkeys
         self.tar_source_from_column = tar_source_from_column
+        self.tar_post_sql_list = tar_post_sql_list
 
     def execute(self, context):
         """
@@ -533,7 +544,8 @@ class RDBMS2RDBMSAppendHook2(BaseHook):
                  tar_columns,
                  append_column,
                  tar_pkeys,
-                 tar_source_from_column):
+                 tar_source_from_column,
+                 tar_post_sql_list):
         self.dag = dag
         self.task_id = task_id
         self.src_conn = self.get_connection(src_conn_id)
@@ -550,6 +562,7 @@ class RDBMS2RDBMSAppendHook2(BaseHook):
         self.max_current_append_value = ""
         self.tar_pkeys = tar_pkeys
         self.tar_source_from_column = tar_source_from_column
+        self.tar_post_sql_list = tar_post_sql_list
 
     def execute(self, context):
         """
@@ -575,7 +588,6 @@ class RDBMS2RDBMSAppendHook2(BaseHook):
         dag = session.query(SyncDAGModel).get(self.dag.dag_id)
         task_name = self.task_id.split("#")[1]
         for t in dag.tasks:
-            self.log.info("呵呵: (%s), (%s)", task_name, t["name"])
             if t["name"] != task_name:
                 continue
             self.max_append_column_value = t.get("max_append_value", "1997-01-01")
@@ -596,7 +608,6 @@ class RDBMS2RDBMSAppendHook2(BaseHook):
                 continue
             t["max_append_value"] = self.max_current_append_value or self.max_append_column_value
             dag.task_json_str = json.dumps(tasks)
-            self.log.info("重置%s" % dag.task_json_str)
             session.commit()
             break
 
@@ -697,8 +708,8 @@ class RDBMS2RDBMSAppendHook2(BaseHook):
         if self.max_append_column_value:
             sql = "SELECT * FROM ({}) as main_ WHERE main_.{} >= '{}'"
             sql = sql.format(self.src_query_sql,
-                            self.append_column,
-                            self.max_append_column_value)
+                             self.append_column,
+                             self.max_append_column_value)
             self.new_src_query_sql = sql
         else:
             self.new_src_query_sql = self.src_query_sql
