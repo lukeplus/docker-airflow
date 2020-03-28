@@ -232,7 +232,7 @@ class RDMS2RDMSDataXJob(DataXJob):
                 "preSql": [
                     self.tar_pre_sql
                 ],
-                "postsql": self.tar_post_sql_list,
+                "postSql": self.tar_post_sql_list,
                 "connection": [{
                     "jdbcUrl": conn.jdbc_url,
                     "table": [self.tar_table]

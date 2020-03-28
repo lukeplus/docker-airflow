@@ -311,7 +311,7 @@ class RDBMS2RDBMSFullHook(BaseHook):
         self.tar_columns = tar_columns
         self.tar_pkeys = tar_pkeys
         self.tar_source_from_column = tar_source_from_column
-        self.tar_post_sql_list = []
+        self.tar_post_sql_list = tar_post_sql_list
         self.init()
 
     def cal_source_from_value(self):
