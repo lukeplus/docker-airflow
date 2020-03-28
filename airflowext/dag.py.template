@@ -46,7 +46,7 @@ dag = DAG(
     append_column='{{t.append_column}}',
     tar_pkeys='{{t.target.pkeys}}',
     tar_source_from_column='{{t.target.source_from_column}}',
-    tar_post_sql_lsit={{t.target.post_sql_list}},
+    tar_post_sql_list={{t.target.post_sql_list}},
     dag=dag,
 )
 {% endfor %}

@@ -522,7 +522,8 @@ class RDBMS2RDBMSAppendHook(BaseHook):
                                 self.generat_new_src_query_sql(),
                                 self.tmp_tar_table,
                                 self.tar_columns,
-                                self.generate_new_tar_pre_sql())
+                                self.generate_new_tar_pre_sql(),
+                                self.tar_post_sql_list)
         job.execute()
 
 
@@ -725,7 +726,8 @@ class RDBMS2RDBMSAppendHook2(BaseHook):
                                 self.new_src_query_sql,
                                 self.tmp_tar_table,
                                 self.tar_columns,
-                                self.generate_new_tar_pre_sql())
+                                self.generate_new_tar_pre_sql(),
+                                self.tar_post_sql_list)
         job.execute()
 
 
