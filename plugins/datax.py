@@ -64,20 +64,17 @@ def timedelta_to_cron_expression(obj):
     if not isinstance(obj, timedelta):
         return obj
 
-    seconds = int(obj.total_seconds())
+    seconds = max(60, int(obj.total_seconds()))
 
-    if seconds < 60:
-        # 从0秒开始，每隔seconds秒执行
-        exp = "0/%s * * * * *" % int(seconds)
-    elif seconds < 60 * 60:
+    if seconds < 60 * 60:
         minutes = int(seconds / 60)
-        exp = "0 0/%s * * * *" % minutes
+        exp = "0/%s * * * *" % minutes
     elif seconds < 60 * 60 * 24:
         hours = int(seconds / (60 * 60))
-        exp = "0 0 0/%s * * *" % hours
+        exp = "0 0/%s * * *" % hours
     else:
         days = int(seconds / (60 * 60 * 24))
-        exp = "0 0 0 1/%s * *" % days
+        exp = "0 0 0/%s * *" % days
     return exp
 
 
