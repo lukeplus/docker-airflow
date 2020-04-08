@@ -22,6 +22,7 @@ default_args = {
     'on_success_callback': main_success_handler,
     'on_retry_callback': main_retry_handler,
     'retry_delay': timedelta(seconds=30),
+
     # 'queue': 'bash_queue',
     # 'pool': 'backfill',
     # 'priority_weight': 10,
@@ -29,7 +30,7 @@ default_args = {
 }
 
 dag = DAG(
-    '{{name}}', default_args=default_args, schedule_interval={{interval}}
+    '{{name}}', default_args=default_args, schedule_interval='{{interval}}'
 )
 {% for t in tasks %}
 
@@ -44,6 +45,7 @@ dag = DAG(
     tar_table="{{t.target.table}}",
     tar_columns={{t.target.columns}},
     append_column='{{t.append_column}}',
+    is_link_table='{{t.is_link_table}}',
     tar_pkeys='{{t.target.pkeys}}',
     tar_source_from_column='{{t.target.source_from_column}}',
     tar_post_sql_list={{t.target.post_sql_list}},

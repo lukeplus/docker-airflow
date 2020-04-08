@@ -27,13 +27,7 @@
         </li>
         <li class="li_label">
             <label class="label_left">时间间隔</label>
-            <input type="text" class="time_interval_input form-control" value="{{dag.interval_time}}">
-            <select name="state" class="time_interval_select selectpicker bs-select-hidden">
-                <option value="d" {% if dag.interval_time_type== 'd' %}selected = "selected"{%endif%}>天</option>
-                <option value="h" {% if dag.interval_time_type== 'h' %}selected = "selected"{%endif%}>时</option>
-                <option value="m" {% if dag.interval_time_type== 'm' %}selected = "selected"{%endif%}>分</option>
-                <option value="s" {% if dag.interval_time_type== 's' %}selected = "selected"{%endif%}>秒</option>
-            </select>
+            <input type="text" class="time_interval_input form-control" value="{{dag.interval}}">
         </li>
         <li class="li_label"></li>
     </ul>
@@ -88,6 +82,7 @@
             subTaskNameInputBlur(taskCard.$ele.find('.sub_task_name'));
             $('.sync_type').selectpicker('refresh');
             $('.append_basis').selectpicker('refresh');
+            $('.is_link_table').selectpicker('refresh');
             hideInvisibleSelectBox();
         });
 
@@ -130,18 +125,22 @@
                 var $sync = $nav.find('.sync_type');
                 var $appendBasis = $nav.find('.append_basis').parents('.li_label');
                 var $maxAppend = $nav.find('.max_append_value').parents('.li_label');
+                var $isLinkTable = $nav.find('.is_link_table').parents('.li_label');
                 $sync.on('changed.bs.select', function (e) {
                     if (e.target.value !== '增量同步') {
                         $appendBasis.css('display', 'none');
                         $maxAppend.css('display', 'none');
+                        $isLinkTable.css('display', 'flex');
                     } else {
                         $appendBasis.css('display', 'flex');
                         $maxAppend.css('display', 'flex');
+                        $isLinkTable.css('display', 'none');
                     }
                 });
                 $appendBasis.on('changed.bs.select', function (e) {
                     if (e.target.value !== '源库时间') {
                         $maxAppend.css('display', 'none');
+                        $isLinkTable.css('display', 'none');
                     } else {
                         $maxAppend.css('display', 'flex');
                     }
@@ -151,6 +150,9 @@
                     $maxAppend.css('display', 'none');
                 } else if ($nav.find('.append_basis').val() !== '源库时间') {
                     $maxAppend.css('display', 'none');
+                    $isLinkTable.css('display', 'none');
+                }else {
+                    $isLinkTable.css('display', 'none');
                 }
             });
         }
@@ -164,7 +166,7 @@
         function postTaskData() {
             var data = {};
             data.sync_type = $('#sync_type_select').val();
-            data.interval = $('.time_interval_input').val() + $('.time_interval_select').val();
+            data.interval = $('.time_interval_input').val();
             var tasks = [];
             $.each($('.subtask_list_card'), function(index, card){
                 var subTask = {};
@@ -173,6 +175,8 @@
                 subTask.pre_task = $card.find('.pre_task_select').val();
                 subTask.sync_type = $card.find('.sync_type').val();
                 subTask.append_basis = $card.find('.append_basis').val();
+                subTask.is_link_table = $card.find('.is_link_table').val();
+                subTask.max_append_value = $card.find('.max_append_value').val();
                 subTask.source = {
                     'conn_id': $card.find('.sql_input_select').val(),
                     'query_sql': $card.find('.sql_input_area').val(),
@@ -200,7 +204,11 @@
                 dataType:"json",
                 success: function(result){
                     // 成功后的操作
-                    alert('保存成功');
+                    if (result.code === 0) {
+                        alert("保存成功");
+                    } else {
+                        alert(result.msg);
+                    }
                 },
                 error: function() {
                     alert('更新失败，请重试！');

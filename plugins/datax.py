@@ -40,53 +40,45 @@ from airflow.www_rbac.app import csrf
 from airflowext.dag_utils import generate_dag_file
 from airflowext.sqlalchemy_utils import dbutil, create_external_session
 from airflowext.datax_util import DataXConnectionInfo, RDMS2RDMSDataXJob
+from croniter import croniter
 
 
 SYNC_TYPES = ["增量同步", "全量同步"]
-
-
-def json_serial(obj):
-    """JSON serializer for objects not serializable by default json code"""
-
-    if isinstance(obj, (datetime, date)):
-        return obj.isoformat()
-    raise TypeError ("Type %s not serializable" % type(obj))
 
 
 def now_date(fmt):
     return datetime.now(pytz.timezone('Asia/Shanghai')).strftime(fmt)
 
 
-def load_interval(text):
+def valid_cron_expression(exp):
     """
-    时间文本转timedelta对象
-
-    eg:
-        >> load_interval("10s")
-           timedelta(seconds=10)
+    验证cron表达式是否有效
     """
-    time_type_trans = {
-        "d": "days",
-        "h": "hours",
-        "m": "minutes",
-        "s": "seconds",
-    }
-    matcher = re.compile("^(\d+)([s|h|d|ms])$").match(text)
-    if not matcher:
-        raise Exception()
-    time, time_type = matcher.groups()
-    return timedelta(**{time_type_trans[time_type]: int(time)})
+    return croniter.is_valid(exp)
 
 
-def dump_interval(obj):
-    if obj.seconds:
-        return "%ss" % obj.seconds
-    if obj.days:
-        return "%sd" % obj.days
-    if obj.hours:
-        return "%sh" % obj.hours
-    if obj.minutes:
-        return "%sm" % obj.minutes
+def timedelta_to_cron_expression(obj):
+    """
+    timedelta对象转成cron字符串
+    """
+    if not isinstance(obj, timedelta):
+        return obj
+
+    seconds = int(obj.total_seconds())
+
+    if seconds < 60:
+        # 从0秒开始，每隔seconds秒执行
+        exp = "0/%s * * * * *" % int(seconds)
+    elif seconds < 60 * 60:
+        minutes = int(seconds / 60)
+        exp = "0 0/%s * * * *" % minutes
+    elif seconds < 60 * 60 * 24:
+        hours = int(seconds / (60 * 60))
+        exp = "0 0 0/%s * * *" % hours
+    else:
+        days = int(seconds / (60 * 60 * 24))
+        exp = "0 0 0 1/%s * *" % days
+    return exp
 
 
 class SyncDAGModel(DagModel):
@@ -101,7 +93,7 @@ class SyncDAGModel(DagModel):
         append_column = "write_date"
         return {
             "name": self.dag_id,
-            "interval": dump_interval(self.schedule_interval),
+            "interval": timedelta_to_cron_expression(self.schedule_interval),
             "state": self.state,
             "tasks": json.loads(self.task_json_str),
             "append_column": append_column,
@@ -144,13 +136,13 @@ class SyncDAGModel(DagModel):
                     "columns": t["target"]["columns"],
                     "source_from_column": t["target"].get("source_from_column", ""),
                     "primary_key": t["target"].get("pkeys", ""),
-                    "post_sql": t["target"].get("postsql", "")
+                    "post_sql": t["target"].get("post_sql", "")
                 },
             }))
 
         data = OrderedDict({
             "name": self.dag_id,
-            "interval": dump_interval(self.schedule_interval),
+            "interval": self.schedule_interval,
             "tasks": tasks
         })
         return json.dumps(data, ensure_ascii=False, indent=2)
@@ -175,7 +167,7 @@ class SyncDAGModel(DagModel):
                     "columns": t["target"]["columns"],
                     "source_from_column": t["target"].get("source_from_column", ""),
                     "pkeys": t["target"].get("primary_key", ""),
-                    "post_sql": t["target"].get("postsql", "")
+                    "post_sql": t["target"].get("post_sql", "")
                 },
             }))
 
@@ -202,6 +194,7 @@ class RDMS2RDMSOperator(BaseOperator):
                  tar_table,
                  tar_columns,
                  append_column,
+                 is_link_table,
                  tar_pkeys,
                  tar_source_from_column,
                  tar_post_sql_list,
@@ -227,6 +220,7 @@ class RDMS2RDMSOperator(BaseOperator):
             self.tar_pkeys = ["id"]
         self.tar_source_from_column = tar_source_from_column
         self.tar_post_sql_list = tar_post_sql_list
+        self.is_link_table = is_link_table or "否"
 
     def execute(self, context):
         """
@@ -236,18 +230,32 @@ class RDMS2RDMSOperator(BaseOperator):
         task_id = context['task_instance'].dag_id + "#" + context['task_instance'].task_id
 
         if self.sync_type == "全量同步":
-            self.hook = RDBMS2RDBMSFullHook(
-                            task_id=task_id,
-                            src_conn_id=self.src_conn_id,
-                            src_query_sql=self.src_query_sql,
-                            src_source_from=self.src_source_from,
-                            tar_conn_id=self.tar_conn_id,
-                            tar_table=self.tar_table,
-                            tar_columns=self.tar_columns,
-                            tar_pkeys=self.tar_pkeys,
-                            tar_source_from_column=self.tar_source_from_column,
-                            tar_post_sql_list=self.tar_post_sql_list
-                        )
+            if self.is_link_table == "是":
+                self.hook = RDBMS2RDBMSFullHook2(
+                                task_id=task_id,
+                                src_conn_id=self.src_conn_id,
+                                src_query_sql=self.src_query_sql,
+                                src_source_from=self.src_source_from,
+                                tar_conn_id=self.tar_conn_id,
+                                tar_table=self.tar_table,
+                                tar_columns=self.tar_columns,
+                                tar_pkeys=self.tar_pkeys,
+                                tar_source_from_column=self.tar_source_from_column,
+                                tar_post_sql_list=self.tar_post_sql_list
+                            )
+            else:
+                self.hook = RDBMS2RDBMSFullHook(
+                                task_id=task_id,
+                                src_conn_id=self.src_conn_id,
+                                src_query_sql=self.src_query_sql,
+                                src_source_from=self.src_source_from,
+                                tar_conn_id=self.tar_conn_id,
+                                tar_table=self.tar_table,
+                                tar_columns=self.tar_columns,
+                                tar_pkeys=self.tar_pkeys,
+                                tar_source_from_column=self.tar_source_from_column,
+                                tar_post_sql_list=self.tar_post_sql_list
+                            )
         elif self.sync_type == "增量同步":
             if self.append_basis == "源库时间":
                 self.hook = RDBMS2RDBMSAppendHook2(
@@ -356,6 +364,156 @@ class RDBMS2RDBMSFullHook(BaseHook):
                                 self.trans_conn_to_datax_conn(self.tar_conn),
                                 self.src_query_sql,
                                 self.tar_table,
+                                self.tar_columns,
+                                self.tar_pre_sql,
+                                self.tar_post_sql_list)
+        job.execute()
+
+
+class RDBMS2RDBMSFullHook2(BaseHook):
+    """
+    Datax执行器:全量同步, 只针对关联表的同步
+    """
+
+    def __init__(self,
+                 task_id,
+                 src_conn_id,
+                 src_query_sql,
+                 src_source_from,
+                 tar_conn_id,
+                 tar_table,
+                 tar_columns,
+                 tar_pkeys,
+                 tar_source_from_column,
+                 tar_post_sql_list):
+        self.task_id = task_id
+        self.src_conn = self.get_connection(src_conn_id)
+        self.src_query_sql = src_query_sql
+        self.src_source_from = src_source_from
+        self.tar_conn = self.get_connection(tar_conn_id)
+        self.tar_table = tar_table
+        self.tmp_tar_table = "tmp_append_%s" % tar_table
+        if src_source_from:
+            self.tmp_tar_table = self.tmp_tar_table + "_" + src_source_from.split(":")[0]
+        self.tar_columns = tar_columns
+        self.tar_pkeys = tar_pkeys
+        self.tar_source_from_column = tar_source_from_column
+        self.tar_post_sql_list = tar_post_sql_list
+        self.init()
+
+    def init(self):
+        where = ""
+        if self.tar_source_from_column:
+            where = "%s='%s'" % (self.tar_source_from_column, self.cal_source_from_value())
+
+        sql = "DELETE FROM %s" % self.tmp_tar_table
+        if where:
+            sql = sql + " WHERE " + where
+        self.tar_pre_sql = sql
+        self.log.info('pre_sql: %s', sql)
+
+    def cal_source_from_value(self):
+        lst = self.src_source_from.split(":")
+        if len(lst) > 1 and lst[0].lower() == "function":
+            return eval(lst[1])
+        return self.src_source_from
+
+    def drop_temp_table(self):
+        """
+        删掉临时表
+        """
+        drop_sql = "DROP TABLE IF EXISTS {table}"
+        if self.tar_conn.conn_type.strip() in ["mssql", "sqlserver"]:
+            drop_sql = """
+            IF EXISTS
+                (SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = '{table}')
+                DROP TABLE {table}
+            """
+        drop_sql = drop_sql.format(table=self.tmp_tar_table)
+        with create_external_session(self.tar_conn) as sess:
+            sess.execute(drop_sql)
+
+    def create_temp_table(self):
+        """
+        创建用于同步的临时表
+        """
+        create_sql = "CREATE TABLE {new_table} AS (SELECT * FROM {old_table} WHERE 1=2)"
+        if self.tar_conn.conn_type.strip() in ["mssql", "sqlserver"]:
+            create_sql = "Select * into {new_table} from {old_table} WHERE 1=2"
+
+        data = {
+            "new_table": self.tmp_tar_table,
+            "old_table": self.tar_table
+        }
+        create_sql = create_sql.format(**data)
+        with create_external_session(self.tar_conn) as sess:
+            sess.execute(create_sql)
+
+    def migrate_temp_table_to_tar_table(self):
+        """
+        把数据从临时表迁移到正式表
+        步骤：
+            1. 将删除行同步到正式表
+            2. 将插入行同步到正式表
+
+        注意：关联表不存在更新情况
+        """
+        pkeys_caluse = " AND ".join(["%s.%s=tmp.%s" % (self.tar_table, c, c) for c in self.tar_columns])
+        columns = ",".join(['"%s"' % c for c in self.tar_columns])
+        data = {
+            "table": self.tar_table,
+            "temp": self.tmp_tar_table,
+            "pkeys_caluse": pkeys_caluse,
+            "columns": columns,
+        }
+
+        insert_sql = """
+            INSERT INTO {table} ({columns})
+            (SELECT {columns} FROM {temp} tmp WHERE not exists
+            (SELECT 1 FROM {table} WHERE {pkeys_caluse}));
+        """
+        insert_sql = insert_sql.format(**data)
+        delete_sql = """
+            DELETE FROM {table} WHERE NOT EXISTS
+            (SELECT 1 FROM {temp} tmp WHERE {pkeys_caluse})
+        """
+        delete_sql = delete_sql.format(**data)
+        with create_external_session(self.tar_conn) as sess:
+            self.log.info("migrate_temp_table_to_tar_table insert_sql: %s", insert_sql)
+            sess.execute(insert_sql)
+            self.log.info("migrate_temp_table_to_tar_table delete_sql: %s", delete_sql)
+            sess.execute(delete_sql)
+
+    def execute(self, context):
+        self.log.info('RDMS2RDMSOperator execute...')
+
+        self.task_id = context['task_instance'].dag_id + "#" + context['task_instance'].task_id
+
+        # self.drop_temp_table()
+        # self.create_temp_table()
+        self.run_datax_job()
+        self.migrate_temp_table_to_tar_table()
+        # self.drop_temp_table()
+
+    def trans_conn_to_datax_conn(self, conn):
+        """
+            airflow Connection对象转datax的DataXConnectionInfo对象
+        """
+        return DataXConnectionInfo(
+            conn.conn_type,
+            conn.host.strip(),
+            str(conn.port),
+            conn.schema.strip(),
+            conn.login.strip(),
+            conn.password.strip(),
+        )
+
+    def run_datax_job(self):
+        job = RDMS2RDMSDataXJob(self.task_id,
+                                self.trans_conn_to_datax_conn(self.src_conn),
+                                self.trans_conn_to_datax_conn(self.tar_conn),
+                                self.src_query_sql,
+                                self.tmp_tar_table,
                                 self.tar_columns,
                                 self.tar_pre_sql,
                                 self.tar_post_sql_list)
@@ -488,7 +646,6 @@ class RDBMS2RDBMSAppendHook(BaseHook):
         with create_external_session(self.tar_conn) as sess:
             self.log.info("migrate_temp_table_to_tar_table start")
             self.log.info("migrate_temp_table_to_tar_table update_sql: %s", update_sql)
-            t1 = time.time()
             sess.execute(update_sql)
             self.log.info("migrate_temp_table_to_tar_table insert_sql: %s", insert_sql)
             sess.execute(insert_sql)
@@ -636,7 +793,7 @@ class RDBMS2RDBMSAppendHook2(BaseHook):
         创建用于增量同步的临时表
         """
         create_sql = "CREATE TABLE {new_table} AS (SELECT * FROM {old_table} WHERE 1=2)"
-        if self.tar_conn.conn_type.strip()  in ["mssql", "sqlserver"]:
+        if self.tar_conn.conn_type.strip() in ["mssql", "sqlserver"]:
             create_sql = "Select * into {new_table} from {old_table} WHERE 1=2"
 
         data = {
@@ -687,13 +844,11 @@ class RDBMS2RDBMSAppendHook2(BaseHook):
         insert_sql = """INSERT INTO {table} ({columns}) (SELECT {columns} FROM {temp} tmp WHERE not exists (SELECT 1 FROM {table} WHERE {pkeys_caluse2}));"""
         insert_sql = insert_sql.format(**data)
         with create_external_session(self.tar_conn) as sess:
-            self.log.info("migrate_temp_table_to_tar_table start")
             self.log.info("migrate_temp_table_to_tar_table update_sql: %s", update_sql)
             t1 = time.time()
             sess.execute(update_sql)
             self.log.info("migrate_temp_table_to_tar_table insert_sql: %s", insert_sql)
             sess.execute(insert_sql)
-            self.log.info("migrate_temp_table_to_tar_table end")
 
     def trans_conn_to_datax_conn(self, conn):
         return DataXConnectionInfo(
@@ -793,19 +948,16 @@ class SyncDAGListView(MethodView):
                 "msg": "名字为%s的DAG已存在!" % name
             })
 
-        try:
-            interval = load_interval(params["interval"])
-        except Exception as e:
-            raise e
+        if not valid_cron_expression(params["interval"]):
             return jsonify({
                 "code": -1,
-                "msg": "interval数据格式错误! %s" % params["interval"]
+                "msg": "非法的cron表达式"
             })
 
         dag = SyncDAGModel(
             dag_id=name,
             owners="luke",
-            schedule_interval=interval,
+            schedule_interval=params["interval"],
             fileloc="",
             task_json_str=json.dumps(params["tasks"]),
             is_active=True,
@@ -863,8 +1015,15 @@ class SyncDAGDetailView(MethodView):
                 "code": -1,
                 "msg": "不存在名为%s的dag" % dag_id
             })
+
         params = json.loads(request.data)
-        dag.schedule_interval = load_interval(params["interval"])
+        if not valid_cron_expression(params["interval"]):
+            return jsonify({
+                "code": -1,
+                "msg": "非法的cron表达式"
+            })
+
+        dag.schedule_interval = params["interval"]
         dag.task_json_str = json.dumps(params["tasks"])
         session.commit()
         dag.refresh_dag_file()
@@ -962,19 +1121,16 @@ def import_dag_from_file(session=None):
             "msg": "名字为%s的DAG已存在!" % name
         })
 
-    try:
-        interval = load_interval(data["interval"])
-    except Exception as e:
-        raise e
+    if not valid_cron_expression(data["interval"]):
         return jsonify({
             "code": -1,
-            "msg": "interval数据格式错误! %s" % params["interval"]
+            "msg": "非法的cron表达式"
         })
 
     dag = SyncDAGModel(
         dag_id=name,
         owners="luke",
-        schedule_interval=interval,
+        schedule_interval=data["interval"],
         fileloc="",
         task_json_str=json.dumps(data["tasks"]),
         is_active=True,
@@ -1094,7 +1250,7 @@ class DataXDAGView(AppBuilderBaseView):
         for dag in qs:
             dags.append({
                 "name": dag.dag_id,
-                "interval": dump_interval(dag.schedule_interval),
+                "interval": dag.schedule_interval,
                 "state": dag.state,
             })
         return self.render_template("datax/list.html",
@@ -1113,12 +1269,6 @@ class DataXDAGView(AppBuilderBaseView):
     def dag_modify_page(self, dag_id, session=None):
         dag = session.query(SyncDAGModel).get(dag_id)
         data = dag.to_json()
-
-        matcher = re.compile("^(\d+)([s|h|d|ms])$").match(data["interval"])
-        if matcher:
-            interval_time, interval_time_type = matcher.groups()
-            data["interval_time"] = interval_time
-            data["interval_time_type"] = interval_time_type
 
         return self.render_template("datax/modify_task.html",
                                     dag=data,

@@ -39,6 +39,7 @@ services:
         volumes:
             - ./dags:/usr/local/airflow/dags
             - ./plugins:/usr/local/airflow/plugins
+            - ./config/airflow.cfg:/usr/local/airflow/airflow.cfg
             - ./airflowext:/usr/local/lib/python3.7/site-packages/airflowext
             - ./airflow:/usr/local/lib/python3.7/site-packages/airflow
         ports:
@@ -70,6 +71,7 @@ services:
             - ./dags:/usr/local/airflow/dags
             - ./plugins:/usr/local/airflow/plugins
             - ./airflowext:/usr/local/lib/python3.7/site-packages/airflowext
+            - ./config/airflow.cfg:/usr/local/airflow/airflow.cfg
             # - ./airflow/airflow:/usr/local/lib/python3.7/site-packages/airflow
         command: flower
 
@@ -86,6 +88,7 @@ services:
             - ./dags:/usr/local/airflow/dags
             - ./plugins:/usr/local/airflow/plugins
             - ./airflowext:/usr/local/lib/python3.7/site-packages/airflowext
+            - ./config/airflow.cfg:/usr/local/airflow/airflow.cfg
             # - ./airflow/airflow:/usr/local/lib/python3.7/site-packages/airflow
         environment:
             - LOAD_EX=n
@@ -110,6 +113,7 @@ services:
             - ./dags:/usr/local/airflow/dags
             - ./plugins:/usr/local/airflow/plugins
             - ./airflowext:/usr/local/lib/python3.7/site-packages/airflowext
+            - ./config/airflow.cfg:/usr/local/airflow/airflow.cfg
               # - ./airflow/airflow:/usr/local/lib/python3.7/site-packages/airflow
         environment:
             - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=

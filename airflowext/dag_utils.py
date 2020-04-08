@@ -10,28 +10,6 @@ CUR_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_PATH = os.path.join(CUR_DIR, "dag.py.template")
 TARGET_DIR = os.environ.get("AIRFLOW_HOME", "/tmp")
 
-
-def trans_interval(text):
-    """
-    时间文本转换
-    """
-    time_type_trans = {
-        "d": "days",
-        "h": "hours",
-        "m": "minutes",
-        "s": "seconds",
-    }
-    params = dict.fromkeys(time_type_trans.values(), 0)
-
-    matcher = re.compile("^(\d+)([s|h|d|ms])$").match(text)
-    if not matcher:
-        raise Exception()
-    time, time_type = matcher.groups()
-    params[time_type_trans[time_type]] = int(time)
-    txt = "timedelta(days={days}, hours={hours}, minutes={minutes}, seconds={seconds})"
-    return txt.format(**params)
-
-
 def generate_dag_file(data):
     """
     生成DAG定义py文件
@@ -53,8 +31,6 @@ def generate_dag_file(data):
         table = t["target"]["table"]
         if table in ["mes_test_record"]:
             t["append_column"] = "create_date"
-        # elif table in ["mes_ate_test_record", "mes_ate_test_record_line"]:
-        #     t["append_column"] = "start_time"
         else:
             t["append_column"] = "write_date"
         t["target"]["post_sql_list"] = [sql.strip() for sql in t["target"].get("post_sql", "").split(";") if sql.strip()]
@@ -66,7 +42,7 @@ def generate_dag_file(data):
         start_date="datetime(%s, %s, %s)" % (today.year, today.month, today.day),
         email="junping.luo@aqara.com",
         retries=1,
-        interval=trans_interval(data["interval"]),
+        interval=data["interval"],
         tasks=tasks,
         parent2child=parent2child,
     )

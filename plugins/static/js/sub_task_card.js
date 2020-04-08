@@ -140,6 +140,10 @@
                             '<input type="text" class="head_input form-control max_append_value" disabled>' +
                             '<a class="reset_append_value">重置</a>' +
                         '</li>' +
+                        '<li class="li_label">' +
+                            '<label class="label_left">关联表</label>' +
+                            '<select name="is_link_table" class="head_input selectpicker is_link_table"><option value="否">否</option><option value="是">是</option></select>' +
+                        '</li>' +
                     '</ul>' +
                     '<ul class="subtask_list_content">' +
                         '<li class="subtask_list_item">' +
@@ -306,6 +310,7 @@
                 $row.find('.target_source_from_input').val(rowValue.target.source_from_column);
                 $row.find('.sync_type').selectpicker('val', rowValue.sync_type);
                 $row.find('.append_basis').selectpicker('val', rowValue.append_basis);
+                $row.find('.is_link_table').selectpicker('val', rowValue.is_link_table);
             },
             setRowPreTaskValue: function() {
                 var $row = this.$ele;
