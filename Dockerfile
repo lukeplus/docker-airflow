@@ -1,11 +1,13 @@
-FROM python:3.7-stretch
+FROM python:3.7.4-stretch
 
 # Never prompts the user for choices on installation/configuration of packages
 ENV DEBIAN_FRONTEND noninteractive
 ENV TERM linux
 
+RUN sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list
+
 # Airflow
-ARG AIRFLOW_VERSION=1.10.4
+ARG AIRFLOW_VERSION=1.10.9
 ARG AIRFLOW_USER_HOME=/usr/local/airflow
 ARG AIRFLOW_DEPS=""
 ARG PYTHON_DEPS=""
@@ -17,13 +19,6 @@ ENV LANG zh_CN.UTF-8
 ENV LC_ALL zh_CN.UTF-8
 ENV LC_CTYPE zh_CN.UTF-8
 ENV LC_MESSAGES zh_CN.UTF-8
-
-# 更换apt源
-RUN sed -i 's/httpredir.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list
-RUN cd /opt && wget http://datax-opensource.oss-cn-hangzhou.aliyuncs.com/datax.tar.gz && \
-    tar -zxvf datax.tar.gz && \
-    rm -f datax.tar.gz
-COPY datax-python3/*.py /opt/datax/bin/
 
 RUN set -ex \
     && buildDeps=' \
@@ -37,7 +32,7 @@ RUN set -ex \
     ' \
     && apt-get update -yqq \
     && apt-get upgrade -yqq \
-    && apt-get install -yqq --no-install-recommends \
+    && apt-get install -yqq --no-install-recommends --fix-missing \
         $buildDeps \
         freetds-bin \
         build-essential \
@@ -61,7 +56,7 @@ RUN set -ex \
     && pip install pyOpenSSL -i https://pypi.douban.com/simple/ \
     && pip install ndg-httpsclient -i https://pypi.douban.com/simple/ \
     && pip install pyasn1 -i https://pypi.douban.com/simple/ \
-    && pip install apache-airflow[crypto,celery,postgres,hive,jdbc,mysql,ssh${AIRFLOW_DEPS:+,}${AIRFLOW_DEPS}]==${AIRFLOW_VERSION} -i https://pypi.douban.com/simple/ \
+    && pip install apache-airflow[crypto,celery,postgres,hive,jdbc,mysql,ldap,ssh${AIRFLOW_DEPS:+,}${AIRFLOW_DEPS}]==${AIRFLOW_VERSION} -i https://pypi.douban.com/simple/ \
     && pip install 'redis==3.2' -i https://pypi.douban.com/simple/ \
     && pip install 'pymssql<3.0' -i https://pypi.douban.com/simple/ \
     && if [ -n "${PYTHON_DEPS}" ]; then pip install ${PYTHON_DEPS} -i https://pypi.douban.com/simple/ ; fi \
@@ -75,6 +70,11 @@ RUN set -ex \
         /usr/share/man \
         /usr/share/doc \
         /usr/share/doc-base
+
+RUN cd /opt && wget http://datax-opensource.oss-cn-hangzhou.aliyuncs.com/datax.tar.gz && \
+    tar -zxvf datax.tar.gz && \
+    rm -f datax.tar.gz
+COPY datax-python3/*.py /opt/datax/bin/
 
 COPY script/entrypoint.sh /entrypoint.sh
 COPY config/airflow.cfg ${AIRFLOW_USER_HOME}/airflow.cfg

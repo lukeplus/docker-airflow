@@ -42,6 +42,7 @@ services:
             - ./config/airflow.cfg:/usr/local/airflow/airflow.cfg
             - ./airflowext:/usr/local/lib/python3.7/site-packages/airflowext
             - ./airflow:/usr/local/lib/python3.7/site-packages/airflow
+            - ./config/webserver_config.py:/usr/local/airflow/webserver_config.py
         ports:
             - "8080:8080"
         command: webserver
