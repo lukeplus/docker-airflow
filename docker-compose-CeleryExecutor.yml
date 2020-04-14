@@ -90,7 +90,7 @@ services:
             - ./plugins:/usr/local/airflow/plugins
             - ./airflowext:/usr/local/lib/python3.7/site-packages/airflowext
             - ./config/airflow.cfg:/usr/local/airflow/airflow.cfg
-            # - ./airflow/airflow:/usr/local/lib/python3.7/site-packages/airflow
+              #- ./airflow/airflow:/usr/local/lib/python3.7/site-packages/airflow
         environment:
             - LOAD_EX=n
             - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
@@ -115,7 +115,7 @@ services:
             - ./plugins:/usr/local/airflow/plugins
             - ./airflowext:/usr/local/lib/python3.7/site-packages/airflowext
             - ./config/airflow.cfg:/usr/local/airflow/airflow.cfg
-              # - ./airflow/airflow:/usr/local/lib/python3.7/site-packages/airflow
+              #- ./airflow/airflow:/usr/local/lib/python3.7/site-packages/airflow
         environment:
             - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
             - EXECUTOR=Celery

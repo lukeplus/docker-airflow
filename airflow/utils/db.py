@@ -375,6 +375,7 @@ def upgradedb():
     config = Config(os.path.join(package_dir, 'alembic.ini'))
     config.set_main_option('script_location', directory.replace('%', '%%'))
     config.set_main_option('sqlalchemy.url', settings.SQL_ALCHEMY_CONN.replace('%', '%%'))
+    command.revision(config)
     command.upgrade(config, 'heads')
     # command.revision(config, message='revision:%s' % str(int(time.time())),
     #                  autogenerate=True)

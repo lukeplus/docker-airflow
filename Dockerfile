@@ -4,10 +4,10 @@ FROM python:3.7.4-stretch
 ENV DEBIAN_FRONTEND noninteractive
 ENV TERM linux
 
-RUN sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list
+COPY ./sources.list /etc/apt/sources.list
 
 # Airflow
-ARG AIRFLOW_VERSION=1.10.9
+ARG AIRFLOW_VERSION=1.10.4
 ARG AIRFLOW_USER_HOME=/usr/local/airflow
 ARG AIRFLOW_DEPS=""
 ARG PYTHON_DEPS=""
@@ -28,11 +28,13 @@ RUN set -ex \
         libssl-dev \
         libffi-dev \
         libpq-dev \
+	python-dev \
+        libldap2-dev \
         git \
     ' \
-    && apt-get update -yqq \
-    && apt-get upgrade -yqq \
-    && apt-get install -yqq --no-install-recommends --fix-missing \
+    && apt-get update -y \
+    # && apt-get upgrade -yqq \
+    && apt-get install -y --no-install-recommends --fix-missing \
         $buildDeps \
         freetds-bin \
         build-essential \
@@ -53,12 +55,14 @@ RUN set -ex \
     && useradd -ms /bin/bash -d ${AIRFLOW_USER_HOME} airflow \
     && pip install -U pip setuptools wheel -i https://pypi.douban.com/simple/\
     && pip install pytz -i https://pypi.douban.com/simple/ \
+    && pip install pyldap -i https://pypi.douban.com/simple/ \
     && pip install pyOpenSSL -i https://pypi.douban.com/simple/ \
     && pip install ndg-httpsclient -i https://pypi.douban.com/simple/ \
     && pip install pyasn1 -i https://pypi.douban.com/simple/ \
     && pip install apache-airflow[crypto,celery,postgres,hive,jdbc,mysql,ldap,ssh${AIRFLOW_DEPS:+,}${AIRFLOW_DEPS}]==${AIRFLOW_VERSION} -i https://pypi.douban.com/simple/ \
     && pip install 'redis==3.2' -i https://pypi.douban.com/simple/ \
     && pip install 'pymssql<3.0' -i https://pypi.douban.com/simple/ \
+    && pip install 'werkzeug<1.0' -i https://pypi.douban.com/simple/ \
     && if [ -n "${PYTHON_DEPS}" ]; then pip install ${PYTHON_DEPS} -i https://pypi.douban.com/simple/ ; fi \
     && apt-get purge --auto-remove -yqq $buildDeps \
     && apt-get autoremove -yqq --purge \
