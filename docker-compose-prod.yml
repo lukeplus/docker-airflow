@@ -1,0 +1,130 @@
+version: '2.1'
+services:
+    redis:
+        image: 'redis:5.0.5'
+        # command: redis-server --requirepass redispass
+
+    postgres:
+        image: postgres:9.6
+        environment:
+            - POSTGRES_USER=airflow
+            - POSTGRES_PASSWORD=airflow
+            - POSTGRES_DB=airflow
+        container_name: airflow_postgres
+        hostname: airflow_postgres
+        # Uncomment these lines to persist data on the local filesystem.
+        #     - PGDATA=/var/lib/postgresql/data/pgdata
+        volumes:
+            - /data/airflow/postgres:/var/lib/postgresql/data
+    webserver:
+        #image: puckel/docker-airflow:1.10.4
+        build: ./
+        image: lumi/airflow
+        restart: always
+        user: root
+        container_name: airflow_webserver
+        hostname: airflow_webserver
+        depends_on:
+            - postgres
+            - redis
+        environment:
+            - LOAD_EX=n
+            - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
+            - EXECUTOR=Celery
+            - POSTGRES_USER=airflow
+            - POSTGRES_PASSWORD=airflow
+            - POSTGRES_DB=airflow
+            - AIRFLOW_WEBSERVER_RBAC=true
+            - ENV=prod
+              # - REDIS_PASSWORD=redispass
+        volumes:
+            - ./dags:/usr/local/airflow/dags
+            - ./plugins:/usr/local/airflow/plugins
+            - ./config/airflow.cfg:/usr/local/airflow/airflow.cfg
+            - ./airflowext:/usr/local/lib/python3.7/site-packages/airflowext
+            - ./airflow:/usr/local/lib/python3.7/site-packages/airflow
+            - ./config/webserver_config.py:/usr/local/airflow/webserver_config.py
+        ports:
+            - "8080:8080"
+        command: webserver
+        healthcheck:
+            test: ["CMD-SHELL", "[ -f /usr/local/airflow/airflow-webserver.pid ]"]
+            interval: 30s
+            timeout: 30s
+            retries: 3
+        stdin_open: true
+        tty: true
+
+    flower:
+      # image: puckel/docker-airflow:1.10.4
+        build: ./
+        image: lumi/airflow
+        restart: always
+        container_name: airflow_flower
+        hostname: airflow_flower
+        depends_on:
+            - redis
+        environment:
+            - EXECUTOR=Celery
+            - ENV=prod
+            # - REDIS_PASSWORD=redispass
+        ports:
+            - "5555:5555"
+        volumes:
+            - ./dags:/usr/local/airflow/dags
+            - ./plugins:/usr/local/airflow/plugins
+            - ./airflowext:/usr/local/lib/python3.7/site-packages/airflowext
+            - ./config/airflow.cfg:/usr/local/airflow/airflow.cfg
+            # - ./airflow/airflow:/usr/local/lib/python3.7/site-packages/airflow
+        command: flower
+
+    scheduler:
+      # image: puckel/docker-airflow:1.10.4
+        build: ./
+        image: lumi/airflow
+        restart: always
+        container_name: airflow_scheduler
+        hostname: airflow_scheduler
+        depends_on:
+            - webserver
+        volumes:
+            - ./dags:/usr/local/airflow/dags
+            - ./plugins:/usr/local/airflow/plugins
+            - ./airflowext:/usr/local/lib/python3.7/site-packages/airflowext
+            - ./config/airflow.cfg:/usr/local/airflow/airflow.cfg
+              #- ./airflow/airflow:/usr/local/lib/python3.7/site-packages/airflow
+        environment:
+            - LOAD_EX=n
+            - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
+            - EXECUTOR=Celery
+            - POSTGRES_USER=airflow
+            - POSTGRES_PASSWORD=airflow
+            - POSTGRES_DB=airflow
+            - ENV=prod
+              # - REDIS_PASSWORD=redispass
+        command: scheduler
+
+    worker:
+      # image: puckel/docker-airflow:1.10.4
+        build: ./
+        image: lumi/airflow
+        restart: always
+        container_name: airflow_worker
+        hostname: airflow_worker
+        depends_on:
+            - scheduler
+        volumes:
+            - ./dags:/usr/local/airflow/dags
+            - ./plugins:/usr/local/airflow/plugins
+            - ./airflowext:/usr/local/lib/python3.7/site-packages/airflowext
+            - ./config/airflow.cfg:/usr/local/airflow/airflow.cfg
+              #- ./airflow/airflow:/usr/local/lib/python3.7/site-packages/airflow
+        environment:
+            - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
+            - EXECUTOR=Celery
+            - POSTGRES_USER=airflow
+            - POSTGRES_PASSWORD=airflow
+            - POSTGRES_DB=airflow
+            - ENV=prod
+              # - REDIS_PASSWORD=redispass
+        command: worker
