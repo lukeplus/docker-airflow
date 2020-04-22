@@ -364,7 +364,7 @@
                     });
                 } else {
                     $.each($row.find('.target_field_column_wrap .field_li'), function(index, dom){
-                        $dom.find('.selectpicker').selectpicker('val', '');
+                        $(dom).find('.selectpicker').selectpicker('val', '');
                     });
                 }
             },
