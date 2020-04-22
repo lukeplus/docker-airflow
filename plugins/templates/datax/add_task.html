@@ -132,7 +132,7 @@
                 subTask.max_append_value = $card.find('.max_append_value').val();
                 subTask.source = {
                     'conn_id': $card.find('.sql_input_select').val(),
-                    'query_sql': $card.find('.sql_input_area').val()
+                    'query_sql': $card.find('.sql_input_area').val(),
                     'source_from': $card.find('.sql_top_input').val()
                 };
                 var columns = $.map($card.find('.target_field_column_wrap select'), function(value){
