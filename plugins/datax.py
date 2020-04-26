@@ -713,8 +713,7 @@ class RDBMS2RDBMSAppendHook2(BaseHook):
             self.tmp_tar_table = self.tmp_tar_table + "_" + src_source_from.split(":")[0]
         self.tar_columns = tar_columns
         self.append_column = append_column
-        self.max_append_column_value = None
-        self.max_current_append_value = ""
+        self.max_append_value = None
         self.tar_pkeys = tar_pkeys
         self.tar_source_from_column = tar_source_from_column
         self.tar_post_sql_list = tar_post_sql_list
@@ -727,48 +726,72 @@ class RDBMS2RDBMSAppendHook2(BaseHook):
 
         self.drop_temp_table()
         self.create_temp_table()
-        self.refresh_max_append_column_value()
+        self.load_max_append_value()
         self.refresh_new_src_query_sql()
         self.run_datax_job()
         self.migrate_temp_table_to_tar_table()
-        self.refresh_current_max_append_value()
+        self.refresh_max_append_value()
         self.drop_temp_table()
-        self.reset_max_append_value()
+        self.save_max_append_value()
 
     @provide_session
-    def refresh_max_append_column_value(self, session=None):
+    def load_max_append_value(self, session=None):
         """
-        刷新增量字段的最大值
+        读取同步时间最大值
+
+        若有前置任务，则使用前置任务的增量字段值
         """
         dag = session.query(SyncDAGModel).get(self.dag.dag_id)
         task_name = self.task_id.split("#")[1]
+
+        task_dct = {}
         for t in dag.tasks:
-            if t["name"] != task_name:
-                continue
-            self.max_append_column_value = t.get("max_append_value", "1997-01-01")
-            break
-        self.log.info("增量字段最大值：%s" % self.max_append_column_value)
-        return self.max_append_column_value
+            task_dct[t["name"]] = t
+
+        root_name = task_name
+        while task_dct[root_name]["pre_task"]:
+            root_name = task_dct[root_name]["pre_task"]
+
+        default = "1997-01-01"
+        if root_name == task_name:
+            self.max_append_value = task_dct[task_name].get("max_append_value", default)
+        else:
+            self.max_append_value = task_dct[root_name].get("last_max_append_value", default)
+        self.log.info("同步时间最大值：%s" % self.max_append_value)
+        return self.max_append_value
 
     @provide_session
-    def reset_max_append_value(self, session=None):
+    def save_max_append_value(self, session=None):
         """
-        刷新增量字段的最大值
+        保存本次同步时间
         """
+
         dag = session.query(SyncDAGModel).get(self.dag.dag_id)
         task_name = self.task_id.split("#")[1]
         tasks = dag.tasks
-        for t in tasks:
-            if t["name"] != task_name:
-                continue
-            t["max_append_value"] = self.max_current_append_value or self.max_append_column_value
-            dag.task_json_str = json.dumps(tasks)
-            session.commit()
-            break
 
-    def refresh_current_max_append_value(self):
+        task_dct = {}
+        for t in tasks:
+            task_dct[t["name"]] = t
+
+        root_name = task_name
+        while task_dct[root_name]["pre_task"]:
+            root_name = task_dct[root_name]["pre_task"]
+
+        default = "1997-01-01"
+        if root_name == task_name:
+            task_dct[task_name]["last_max_append_value"] = task_dct[task_name].get("max_append_value", default)
+            task_dct[task_name]["max_append_value"] = self.max_append_value
+        else:
+            task_dct[task_name]["last_max_append_value"] = task_dct[root_name].get("max_append_value", default)
+            task_dct[task_name]["max_append_value"] = min(task_dct[root_name]["max_append_value"], self.max_append_value)
+
+        dag.task_json_str = json.dumps(tasks)
+        session.commit()
+
+    def refresh_max_append_value(self):
         """
-        刷新本次增量字段的最大值
+        刷新本次同步时间
         """
         where = ""
         if self.tar_source_from_column:
@@ -782,8 +805,8 @@ class RDBMS2RDBMSAppendHook2(BaseHook):
             result = sess.execute(sql)
         record = result.fetchone()
         if record[0]:
-            self.max_current_append_value = record[0].strftime("%Y-%m-%d %H:%M:%S")
-        return self.max_current_append_value
+            self.max_append_value = record[0].strftime("%Y-%m-%d %H:%M:%S")
+        return self.max_append_value
 
     def create_temp_table(self):
         """
@@ -858,11 +881,11 @@ class RDBMS2RDBMSAppendHook2(BaseHook):
         )
 
     def refresh_new_src_query_sql(self):
-        if self.max_append_column_value:
+        if self.max_append_value:
             sql = "SELECT * FROM ({}) as main_ WHERE main_.{} >= '{}'"
             sql = sql.format(self.src_query_sql,
                              self.append_column,
-                             self.max_append_column_value)
+                             self.max_append_value)
             self.new_src_query_sql = sql
         else:
             self.new_src_query_sql = self.src_query_sql
