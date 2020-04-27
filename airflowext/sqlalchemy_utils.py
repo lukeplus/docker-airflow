@@ -87,7 +87,7 @@ def get_external_tables(session):
 
 def get_external_columns(session, table):
     sql_dct = {
-        "postgresql": "select column_name,data_type from information_schema.columns where table_name='%s';" % table,
+        "postgresql": "select column_name from information_schema.columns where table_name='%s';" % table,
         "mssql+pymssql": "Select Name FROM SysColumns Where id=Object_Id('%s');" % table,
         "mysql": "select column_name from information_schema.columns where table_schema =(select database()) and table_name = '%s'" % table,
     }
@@ -100,7 +100,7 @@ def get_external_columns(session, table):
     for row in result.fetchall():
         tables.append({
             "column_name": row[0],
-            "data_type": row[1]
+            #"data_type": row[1]
         })
     return tables
 
