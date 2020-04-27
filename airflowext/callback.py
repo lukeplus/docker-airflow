@@ -41,7 +41,7 @@ def main_failure_handler(info):
         "Content-Type": "application/json",
         "Accept": "application/json;charset=utf-8"
     }
-    requests.post(WEBHOOK_URL, data=json.dumps(payload), headers=headers)
+    #requests.post(WEBHOOK_URL, data=json.dumps(payload), headers=headers)
 
 
 def main_success_handler(info):

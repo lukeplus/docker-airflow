@@ -70,15 +70,14 @@ def _build_external_session(conn_params):
 def get_external_tables(session):
     """
     return all tables of given database session
-
-    目前只支持PG库
     """
     sql_dct = {
         "postgresql": "select tablename from pg_tables where schemaname='public'",
         "mssql+pymssql": "SELECT Name FROM SysObjects WHERE XType='U' ORDER BY Name",
+        "mysql": "select table_name from information_schema.tables where table_schema = (select database())"
     }
     assert session.conn_type in sql_dct
-
+    print("get_external_tables: %s" % sql_dct[session.conn_type])
     result = session.execute(sql_dct[session.conn_type])
     tables = []
     for row in result.fetchall():
@@ -90,10 +89,12 @@ def get_external_columns(session, table):
     sql_dct = {
         "postgresql": "select column_name,data_type from information_schema.columns where table_name='%s';" % table,
         "mssql+pymssql": "Select Name FROM SysColumns Where id=Object_Id('%s');" % table,
+        "mysql": "select column_name from information_schema.columns where table_schema =(select database()) and table_name = '%s'" % table,
     }
     assert session.conn_type in sql_dct
 
-    sql = "select column_name,data_type from information_schema.columns where table_name='%s';" % table
+    sql = sql_dct[session.conn_type]
+    print("get_external_columns: %s" % sql_dct[session.conn_type])
     result = session.execute(sql)
     tables = []
     for row in result.fetchall():
