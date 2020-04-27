@@ -50,3 +50,12 @@ def main_success_handler(info):
 
 def main_retry_handler(info):
     pass
+
+
+def check_count_fail(info):
+    "同步条目检查失败"
+    if ENV == "dev":
+        print("Alert disabled in develop environment")
+        return
+    msg = "一致性检查失败: %s" % info
+    print(msg)

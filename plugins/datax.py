@@ -38,6 +38,7 @@ from airflow.models import BaseOperator, Connection, DagModel, DagRun
 from airflow.utils.db import create_session, provide_session
 from airflow.www_rbac.app import csrf
 from airflowext.dag_utils import generate_dag_file
+from airflowext.callback import check_count_fail
 from airflowext.sqlalchemy_utils import dbutil, create_external_session
 from airflowext.datax_util import DataXConnectionInfo, RDMS2RDMSDataXJob
 from croniter import croniter
@@ -291,7 +292,58 @@ class RDMS2RDMSOperator(BaseOperator):
         os.killpg(os.getpgid(self.hook.sp.pid), signal.SIGTERM)
 
 
-class RDBMS2RDBMSFullHook(BaseHook):
+class HookMixin(object):
+
+    def check_consistency(self):
+        """
+        检查同步后的数据一致性
+        """
+        self.check_record_count()
+
+    def check_record_count(self):
+        "检查两边数据条目数是否一致"
+        with create_external_session(self.src_conn) as sess:
+            if hasattr(self, "max_append_value"):
+                sql = "SELECT count(1) FROM ({}) as main_ WHERE main_.{} <= '{}'"
+                sql = sql.format(self.src_query_sql,
+                                 self.append_column,
+                                 self.max_append_value)
+            else:
+                sql = "SELECT count(1) FROM (%s)" % self.src_query_sql
+            result = sess.execute(sql)
+            src_count = int(result.fetchone()[0])
+            self.log.info("check_record_count sql for source: %s", sql)
+
+        with create_external_session(self.tar_conn) as sess:
+            where_split = []
+            if self.tar_source_from_column:
+                where_split.append("%s='%s'" % (self.tar_source_from_column,
+                                                self.src_source_from))
+
+            if getattr(self, "max_append_value", None):
+                where_split.append("%s<='%s'" % (self.append_column,
+                                                 self.max_append_value))
+
+            where = "AND".join(where_split)
+
+            sql = "SELECT count(1) FROM %s" % self.tar_table
+            if where:
+                sql = sql + " WHERE " + where
+            self.log.info("check_record_count sql for target: %s", sql)
+            result = sess.execute(sql)
+            tar_count = int(result.fetchone()[0])
+
+        self.log.info("check_record_count result: source(%s) target(%s)",
+                      src_count, tar_count)
+
+        if src_count != tar_count:
+            check_count_fail({
+                "src_count": src_count,
+                "tar_count": tar_count,
+            })
+
+
+class RDBMS2RDBMSFullHook(BaseHook, HookMixin):
     """
     Datax执行器:全量同步
     """
@@ -341,6 +393,7 @@ class RDBMS2RDBMSFullHook(BaseHook):
 
         self.task_id = context['task_instance'].dag_id + "#" + context['task_instance'].task_id
         self.run_datax_job()
+        self.check_consistency()
 
     def trans_conn_to_datax_conn(self, conn):
         """
@@ -367,7 +420,7 @@ class RDBMS2RDBMSFullHook(BaseHook):
         job.execute()
 
 
-class RDBMS2RDBMSFullHook2(BaseHook):
+class RDBMS2RDBMSFullHook2(BaseHook, HookMixin):
     """
     Datax执行器:全量同步, 只针对关联表的同步
     """
@@ -491,6 +544,7 @@ class RDBMS2RDBMSFullHook2(BaseHook):
         self.run_datax_job()
         self.migrate_temp_table_to_tar_table()
         # self.drop_temp_table()
+        self.check_consistency()
 
     def trans_conn_to_datax_conn(self, conn):
         """
@@ -517,7 +571,7 @@ class RDBMS2RDBMSFullHook2(BaseHook):
         job.execute()
 
 
-class RDBMS2RDBMSAppendHook(BaseHook):
+class RDBMS2RDBMSAppendHook(BaseHook, HookMixin):
     """
     Datax执行器: 增量同步
     """
@@ -564,6 +618,7 @@ class RDBMS2RDBMSAppendHook(BaseHook):
         self.run_datax_job()
         self.migrate_temp_table_to_tar_table()
         self.drop_temp_table()
+        self.check_consistency()
 
     def refresh_max_append_column_value(self):
         """
@@ -658,7 +713,7 @@ class RDBMS2RDBMSAppendHook(BaseHook):
             conn.password.strip(),
         )
 
-    def generat_new_src_query_sql(self):
+    def generate_new_src_query_sql(self):
         if not self.max_append_column_value:
             return self.src_query_sql
         sql = "SELECT * FROM ({}) as main_ WHERE main_.{} >= '{}'"
@@ -673,7 +728,7 @@ class RDBMS2RDBMSAppendHook(BaseHook):
         job = RDMS2RDMSDataXJob(self.task_id,
                                 self.trans_conn_to_datax_conn(self.src_conn),
                                 self.trans_conn_to_datax_conn(self.tar_conn),
-                                self.generat_new_src_query_sql(),
+                                self.generate_new_src_query_sql(),
                                 self.tmp_tar_table,
                                 self.tar_columns,
                                 self.generate_new_tar_pre_sql(),
@@ -681,7 +736,7 @@ class RDBMS2RDBMSAppendHook(BaseHook):
         job.execute()
 
 
-class RDBMS2RDBMSAppendHook2(BaseHook):
+class RDBMS2RDBMSAppendHook2(BaseHook, HookMixin):
     """
     Datax执行器: 增量同步
 
@@ -733,6 +788,7 @@ class RDBMS2RDBMSAppendHook2(BaseHook):
         self.refresh_max_append_value()
         self.drop_temp_table()
         self.save_max_append_value()
+        self.check_consistency()
 
     @provide_session
     def load_max_append_value(self, session=None):
@@ -753,12 +809,10 @@ class RDBMS2RDBMSAppendHook2(BaseHook):
             root_name = task_dct[root_name]["pre_task"]
 
         default = "1997-01-01"
-        if root_name == task_name:
-            self.max_append_value = task_dct[task_name].get("max_append_value", default)
-        else:
-            self.max_append_value = task_dct[root_name].get("last_max_append_value", default)
+        self.max_append_value = task_dct[task_name].get("max_append_value", default)
+        self.root_max_append_value = task_dct[root_name].get("max_append_value", default)
         self.log.info("同步时间最大值：%s" % self.max_append_value)
-        return self.max_append_value
+        return self.max_append_value, self.root_max_append_value
 
     @provide_session
     def save_max_append_value(self, session=None):
@@ -774,18 +828,8 @@ class RDBMS2RDBMSAppendHook2(BaseHook):
         for t in tasks:
             task_dct[t["name"]] = t
 
-        root_name = task_name
-        while task_dct[root_name]["pre_task"]:
-            root_name = task_dct[root_name]["pre_task"]
-
         default = "1997-01-01"
-        if root_name == task_name:
-            task_dct[task_name]["last_max_append_value"] = task_dct[task_name].get("max_append_value", default)
-            task_dct[task_name]["max_append_value"] = self.max_append_value
-        else:
-            task_dct[task_name]["last_max_append_value"] = task_dct[root_name].get("max_append_value", default)
-            task_dct[task_name]["max_append_value"] = min(task_dct[root_name]["max_append_value"], self.max_append_value)
-
+        task_dct[task_name]["max_append_value"] = self.max_append_value
         dag.task_json_str = json.dumps(tasks)
         session.commit()
 
@@ -829,7 +873,7 @@ class RDBMS2RDBMSAppendHook2(BaseHook):
         删掉临时表
         """
         drop_sql = "DROP TABLE IF EXISTS {table}"
-        if self.tar_conn.conn_type.strip()  in ["mssql", "sqlserver"]:
+        if self.tar_conn.conn_type.strip() in ["mssql", "sqlserver"]:
             drop_sql = """
             IF EXISTS
                 (SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = '{table}')
@@ -887,6 +931,8 @@ class RDBMS2RDBMSAppendHook2(BaseHook):
                              self.append_column,
                              self.max_append_value)
             self.new_src_query_sql = sql
+            if self.root_max_append_value and self.root_max_append_value > self.max_append_value:
+                sql += " AND main_.%s<= '%s'" % (self.append_column, self.root_max_append_value)
         else:
             self.new_src_query_sql = self.src_query_sql
 
