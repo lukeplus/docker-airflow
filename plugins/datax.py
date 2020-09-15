@@ -303,13 +303,13 @@ class HookMixin(object):
     def check_record_count(self):
         "检查两边数据条目数是否一致"
         with create_external_session(self.src_conn) as sess:
-            if hasattr(self, "max_append_value"):
+            if getattr(self, "max_append_value", None):
                 sql = "SELECT count(1) FROM ({}) as main_ WHERE main_.{} <= '{}'"
                 sql = sql.format(self.src_query_sql,
                                  self.append_column,
                                  self.max_append_value)
             else:
-                sql = "SELECT count(1) FROM (%s)" % self.src_query_sql
+                sql = "SELECT count(1) FROM (%s) as main_" % self.src_query_sql
             result = sess.execute(sql)
             src_count = int(result.fetchone()[0])
             self.log.info("check_record_count sql for source: %s", sql)
@@ -320,11 +320,11 @@ class HookMixin(object):
                 where_split.append("%s='%s'" % (self.tar_source_from_column,
                                                 self.src_source_from))
 
-            if getattr(self, "max_append_value", None):
-                where_split.append("%s<='%s'" % (self.append_column,
-                                                 self.max_append_value))
+            # if getattr(self, "max_append_value", None):
+            #     where_split.append("%s<='%s'" % (self.append_column,
+            #                                      self.max_append_value[:23]))
 
-            where = "AND".join(where_split)
+            where = " AND ".join(where_split)
 
             sql = "SELECT count(1) FROM %s" % self.tar_table
             if where:
@@ -338,6 +338,7 @@ class HookMixin(object):
 
         if src_count != tar_count:
             check_count_fail({
+                "task_id": self.task_id,
                 "src_count": src_count,
                 "tar_count": tar_count,
             })
@@ -628,7 +629,7 @@ class RDBMS2RDBMSAppendHook(BaseHook, HookMixin):
         if self.tar_source_from_column:
             where = "%s='%s'" % (self.tar_source_from_column, self.src_source_from)
 
-        sql = "SELECT max(%s) FROM %s " % (self.append_column, self.tar_table)
+        sql = "SELECT max(%s::timestamp(3) without time zone) FROM %s " % (self.append_column, self.tar_table)
         if where:
             sql = sql + " WHERE " + where
 
@@ -786,9 +787,25 @@ class RDBMS2RDBMSAppendHook2(BaseHook, HookMixin):
         self.run_datax_job()
         self.migrate_temp_table_to_tar_table()
         self.refresh_max_append_value()
+        try:
+            self.log_append_records()
+        except:
+            pass
         self.drop_temp_table()
         self.save_max_append_value()
         self.check_consistency()
+
+    @provide_session
+    def log_append_records(self, session=None):
+        """
+        记录下本次同步的条目
+        """
+        columns = ",".join(['"%s"' % c for c in self.tar_pkeys])
+        sql = 'SELECT %s FROM %s' % (columns, self.tmp_tar_table)
+        with create_external_session(self.tar_conn) as sess:
+            result = sess.execute(sql)
+            records = result.fetchall()
+            self.log.info("本次同步记录：%s", str(records))
 
     @provide_session
     def load_max_append_value(self, session=None):
@@ -811,7 +828,8 @@ class RDBMS2RDBMSAppendHook2(BaseHook, HookMixin):
         default = "1997-01-01"
         self.max_append_value = task_dct[task_name].get("max_append_value", default)
         self.root_max_append_value = task_dct[root_name].get("max_append_value", default)
-        self.log.info("同步时间最大值：%s" % self.max_append_value)
+        self.log.info("load max append value, current: %s, root: %s", self.max_append_value, self.root_max_append_value)
+        self.log.info(task_dct)
         return self.max_append_value, self.root_max_append_value
 
     @provide_session
@@ -841,7 +859,7 @@ class RDBMS2RDBMSAppendHook2(BaseHook, HookMixin):
         if self.tar_source_from_column:
             where = "%s='%s'" % (self.tar_source_from_column, self.src_source_from)
 
-        sql = "SELECT max(%s) FROM %s " % (self.append_column, self.tmp_tar_table)
+        sql = "SELECT max(%s::timestamp(3) without time zone) FROM %s " % (self.append_column, self.tmp_tar_table)
         if where:
             sql = sql + " WHERE " + where
 
@@ -849,7 +867,8 @@ class RDBMS2RDBMSAppendHook2(BaseHook, HookMixin):
             result = sess.execute(sql)
         record = result.fetchone()
         if record[0]:
-            self.max_append_value = record[0].strftime("%Y-%m-%d %H:%M:%S")
+            self.log.info("******** %s", str(record))
+            self.max_append_value = record[0].strftime("%Y-%m-%d %H:%M:%S.%f")
         return self.max_append_value
 
     def create_temp_table(self):
@@ -926,13 +945,28 @@ class RDBMS2RDBMSAppendHook2(BaseHook, HookMixin):
 
     def refresh_new_src_query_sql(self):
         if self.max_append_value:
-            sql = "SELECT * FROM ({}) as main_ WHERE main_.{} >= '{}'"
-            sql = sql.format(self.src_query_sql,
-                             self.append_column,
-                             self.max_append_value)
+            if self.task_id == "sync_erp_stock_data_to_mrp#sync_stock_picking":
+                sql = "SELECT * FROM ({}) as main_ WHERE (main_.{} >= '{}' OR main_.date_done >= '{}')"
+
+                last_date = self.max_append_value[:19]   # 丢掉秒后面的精度
+                sql = sql.format(self.src_query_sql,
+                                 self.append_column,
+                                 last_date,
+                                 last_date)
+            else:
+                sql = "SELECT * FROM ({}) as main_ WHERE main_.{} >= '{}'"
+                sql = sql.format(self.src_query_sql,
+                                self.append_column,
+                                self.max_append_value)
+            # if self.root_max_append_value and self.root_max_append_value > self.max_append_value:
+            #     sql += " AND main_.%s<= '%s'" % (self.append_column, self.root_max_append_value)
             self.new_src_query_sql = sql
-            if self.root_max_append_value and self.root_max_append_value > self.max_append_value:
-                sql += " AND main_.%s<= '%s'" % (self.append_column, self.root_max_append_value)
+        # elif getattr(self, "root_max_append_value", None):
+        #     sql = "SELECT * FROM ({}) as main_ WHERE main_.{} <= '{}'"
+        #     sql = sql.format(self.src_query_sql,
+        #                      self.append_column,
+        #                      self.root_max_append_value)
+        #     self.new_src_query_sql = sql
         else:
             self.new_src_query_sql = self.src_query_sql
 

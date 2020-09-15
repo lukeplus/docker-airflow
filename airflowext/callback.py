@@ -13,6 +13,13 @@ DAG名称:  {dag_id}
 本次执行时间：{execution_date}
 """
 
+tpl_fail_msg_check = """Airflow DAG一致性校验失败
+
+DAG名称:  {dag_id}
+任务名称：{task_id}
+message: {msg}
+"""
+
 ENV = os.environ.get("ENV", "dev")
 
 
@@ -41,7 +48,7 @@ def main_failure_handler(info):
         "Content-Type": "application/json",
         "Accept": "application/json;charset=utf-8"
     }
-    #requests.post(WEBHOOK_URL, data=json.dumps(payload), headers=headers)
+    requests.post(WEBHOOK_URL, data=json.dumps(payload), headers=headers)
 
 
 def main_success_handler(info):
@@ -57,5 +64,24 @@ def check_count_fail(info):
     if ENV == "dev":
         print("Alert disabled in develop environment")
         return
-    msg = "一致性检查失败: %s" % info
-    print(msg)
+    dag_id, task_id = info["task_id"].split("#")
+    data = {
+       "dag_id": dag_id,
+       "task_id": task_id,
+       "msg": "条目数不一致，源表%s条，目的表%s条" % (info["src_count"], info["tar_count"]),
+    }
+    body = tpl_fail_msg_check.format(**data)
+    payload = {
+        "msgtype": 'text',
+        "text": {
+            "content": body
+        },
+        "at": {
+            "isAtAll": False
+        }
+    }
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json;charset=utf-8"
+    }
+    # requests.post(WEBHOOK_URL, data=json.dumps(payload), headers=headers)
